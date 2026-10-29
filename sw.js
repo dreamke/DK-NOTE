@@ -6,18 +6,19 @@
  *   - 其它同源 GET（图标等零散文件）→ 缓存优先
  * 版本号变了才会清旧缓存；改 index.html 不需要改它，导航那一支会自己更新。
  */
-const VER = 'v2';
+const VER = 'v3';
 const CACHE = 'dknote-' + VER;
 const PAGE = './index.html';
-
-const PRECACHE = ['./', PAGE];
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    // 逐个加，个别文件失败不拖累整体安装。
-    // 不写 cache:'reload'：页面刚下过这些文件，走 HTTP 缓存直接取，不会重复下载那 3.6MB。
-    await Promise.all(PRECACHE.map((u) => c.add(u).catch(() => {})));
+    /* 只存一个文件，而且用 force-cache 取：页面刚刚下载完，HTTP 缓存里就有，
+       不会真的再走一遍网络。之前用 c.add() 会重新下载 5MB，首访结束都装不完。 */
+    try {
+      const r = await fetch(PAGE, { cache: 'force-cache' });
+      if (r && r.ok) await c.put(PAGE, r);
+    } catch (err) { /* 取不到就算了，导航那一支会回填 */ }
     await self.skipWaiting();
   })());
 });
