@@ -6,9 +6,12 @@
  *   - 其它同源 GET（图标等零散文件）→ 缓存优先
  * 版本号变了才会清旧缓存；改 index.html 不需要改它，导航那一支会自己更新。
  */
-const VER = 'v3';
+const VER = 'v4';
 const CACHE = 'dknote-' + VER;
-const PAGE = './index.html';
+/* 缓存 key 用目录根，和用户实际访问的地址一致。
+   写成 './index.html' 会和页面 URL '/DK-NOTE/' 变成两个缓存条目，
+   预缓存时命中不了刚下载的那份，等于白下一次 5MB。 */
+const PAGE = './';
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
