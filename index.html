@@ -680,7 +680,7 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
     <div class="doc-head">
       <div class="title-row">
         <button id="btn-prev-day" class="day-nav prev hidden" title="前一天" tabindex="-1">‹</button>
-        <input id="doc-title" class="doc-title" placeholder="无标题" spellcheck="false" />
+        <input id="doc-title" class="doc-title" name="orca-title" placeholder="无标题" spellcheck="false" autocomplete="off" data-form-type="other" />
         <button id="btn-next-day" class="day-nav hidden" title="后一天" tabindex="-1">›</button>
         <span class="wc-badge" id="wc-badge" title="字数">0</span>
       </div>
@@ -688,7 +688,7 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
         <button id="btn-fav" class="doc-fav" title="收藏" tabindex="-1">☆</button>
         <span class="dt-label">标签</span>
         <span class="dt-chips" id="dt-chips"></span>
-        <input id="dt-input" class="dt-input" placeholder="＋ 添加标签" spellcheck="false" />
+        <input id="dt-input" class="dt-input" name="orca-tag" placeholder="＋ 添加标签" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" data-form-type="other" />
         <div class="tag-suggest hidden" id="tag-suggest"></div>
       </div>
     </div>
@@ -1665,6 +1665,11 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
     p = p || curPane();
     const clean = String(tag || '').trim().replace(/^#+/, '').replace(/\s+/g, '');
     if (!clean) return;
+    // 浏览器自动填充会往标签框里塞邮箱，别让它变成正文里的 #xxx
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      status('这看起来是邮箱地址，没有当作标签写入');
+      return;
+    }
     if (extractTags(getMd(p)).includes(clean)) { renderDocTags(p); return; }
     // 标签就是正文末尾的一行 #标签：直接改 Markdown，再交回编辑器渲染
     const md = getMd(p).replace(/\s+$/, '');
@@ -3796,6 +3801,7 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
     tblSizeLoad(p);                    // 恢复这篇笔记里拖过的表格列宽 / 行高
     updateWc(p);
     renderDocTags(p);
+    if (p.el.tagInput) p.el.tagInput.value = '';   // 换笔记清掉标签框残留（含浏览器自动填充塞进来的值）
     renderFav(p);
     if (p === curPane()) {
       setSaveState(note.draft ? '未创建（输入内容后自动保存）' : '未修改', p);
@@ -4481,11 +4487,11 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
         if (tags.length) removeTag(tags[tags.length - 1], p);
       }
     });
+    // 失焦只收起建议，绝不把框里的字自动变成标签：
+    // 这个 input 会被浏览器自动填充（邮箱、地址之类），一旦顺手点一下正文就触发 blur，
+    // 填充值会被写进正文变成 #dreamke@foxmail.com。只认 Enter / 逗号。
     dtInput.addEventListener('blur', () => {
-      setTimeout(() => {
-        if (dtInput.value.trim()) { addTag(dtInput.value, p); dtInput.value = ''; }
-        hideTagSuggest(p);
-      }, 130);
+      setTimeout(() => { hideTagSuggest(p); }, 130);
     });
 
     tblBindPane(p);          // 表格列宽 / 行高拖拽
