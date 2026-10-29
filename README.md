@@ -2,7 +2,7 @@
 
 日志型的本地 Markdown 笔记应用。左侧日历选日期，右侧直接写，一天一篇，笔记存成干净的 Markdown 文本。
 
-纯静态单页，没有后端、没有账号、没有网络请求。打开即用，数据留在浏览器里，可整库导出成 zip。
+纯静态单页，没有后端、没有账号、运行时零网络请求——编辑器依赖全部内联在这一个 HTML 里，双击就能打开，数据留在浏览器。
 
 ![主界面](assets/screenshots/01-main.png)
 
@@ -66,6 +66,10 @@
 
 ## 本地运行
 
+**双击 `index.html` 就能用**，不需要服务、不需要网络。编辑器内核（Vditor、lute、highlight.js、图标、语言包）全部内联在这一个 5.3 MB 的 HTML 里，运行时零请求，所以 `file://` 下也没有跨域问题——实测 1.5 秒进入可编辑状态，数据照样写 IndexedDB。
+
+想要固定地址、方便多标签打开，也可以起个本地服务：
+
 ```bash
 git clone https://github.com/dreamke/DK-NOTE.git
 cd DK-NOTE
@@ -74,17 +78,26 @@ node dev-server.js        # http://127.0.0.1:8787/
 
 `dev-server.js` 只是个静态文件服务，任何 HTTP 服务器都行（`python -m http.server` 也可以）。
 
-直接双击 `index.html` 也能用（`file://` 下脚本与样式照常加载，数据照样写 IndexedDB），实测约 1.3 秒就位；想要固定地址、方便多标签打开，再用上面的本地服务。
+线上版本首次打开要把这 5.3 MB 下载完（gzip 约 1.1 MB），国内直连 GitHub Pages 实测 20–60 秒，取决于带宽。页面带了一个 Service Worker，首次访问在后台缓存整页，之后打开约 0.2 秒，断网也能继续写。**嫌慢就别开线上版，把 `index.html` 存到本地双击**——本机读 5 MB 文件不到一毫秒。
 
-首次打开会停在「正在加载编辑器」——内核 lute 未压缩 3.6 MB（gzip 约 609 KB）。本地服务瞬间完成，线上托管则取决于带宽：国内直连 GitHub Pages 实测 20–30 秒。因此线上版本带了一个 Service Worker，首次访问在后台把内核缓存下来，之后打开约 0.2 秒，断网也能继续写。
+## 改代码
+
+`index.html` 是构建产物，不要直接改。源码在 `src.html`，改完重新打包：
+
+```bash
+node build.js      # src.html + vditor/dist → index.html
+```
+
+`build.js` 做三件事：把 `vditor/dist` 下的 CSS/JS 内联进页面；给每个资源补上 Vditor 认的 id（`vditorLuteScript`、`vditorHljsScript`…，Vditor 的加载函数先查 id，命中就跳过，于是不发请求）；把 4 套内容主题与 2 套代码主题的样式转成 `<style>`，避免切换主题时退回 `<link>`。
 
 ## 技术实现
 
-单个 `index.html`（约 4800 行）承载全部界面与逻辑，样式、脚本内联，Vditor 与图标精灵本地内置，运行时零外部请求。
+单页应用，无框架、无构建链、无后端。界面与逻辑写在 `src.html` 里，编辑器依赖由 `build.js` 内联成单个 `index.html`。
 
 | 部分 | 做法 |
 | --- | --- |
 | 编辑器 | Vditor 固定 IR 模式；双栏时右栏克隆左栏 DOM（`id` 统一加 `-b`），改一处两栏同步 |
+| 打包 | 把 Vditor、lute、highlight.js、图标、语言包内联进 HTML，并预置 Vditor 认的资源 id，让它以为已经加载过，从而零请求、零 XHR |
 | Markdown | 读写走 `mdForEditor` / `mdForStore` 两个兑换口，只在边界上处理图片载荷 |
 | 双链 | 存的就是 `[[标题]]` 纯文本，渲染时后置包一层 chip，`textContent` 一个字都不改——否则反解 Markdown 会丢括号 |
 | 字色 / 高亮 | Lute 把内联 HTML 收进 `span[data-type="html-inline"]`，再在标记之间套纯样式元素上色，两层分离 |
@@ -101,10 +114,13 @@ node dev-server.js        # http://127.0.0.1:8787/
 
 ```
 DK-NOTE/
-├── index.html              主程序（样式 + 逻辑内联）
+├── index.html              构建产物：单文件应用，双击即用（5.3 MB）
+├── src.html                源码：改这里，然后跑 build.js
+├── build.js                打包脚本：把编辑器依赖内联进 index.html
+├── sw.js                   离线缓存（线上版本用）
 ├── dev-server.js           本地预览用的静态服务
 ├── assets/                 图标与截图
-└── vditor/dist/            编辑器内核（本地内置）
+└── vditor/dist/            编辑器依赖的原始文件（构建输入，运行时不再请求）
 ```
 
 ## 许可

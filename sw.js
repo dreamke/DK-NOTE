@@ -1,26 +1,16 @@
 /* DK NOTE 离线缓存
- * 目标：编辑器内核 3.6MB，线上每次冷启动要十几秒；缓存后第二次打开是 0.2s，断网也能用。
+ * 页面本身已经是单文件：编辑器内核全部内联在 index.html 里，运行时不再请求任何静态资源。
+ * 所以这里只需要缓存这一个文件：首次访问下载一次（5.3MB，gzip 约 1.1MB），之后秒开，断网也能写。
  * 策略：
  *   - 页面导航 → 先用缓存秒开，同时后台拉新版（下次打开即新版本）
- *   - 其它同源 GET（vditor/、assets/ 等）→ 缓存优先
+ *   - 其它同源 GET（图标等零散文件）→ 缓存优先
  * 版本号变了才会清旧缓存；改 index.html 不需要改它，导航那一支会自己更新。
  */
-const VER = 'v1';
+const VER = 'v2';
 const CACHE = 'dknote-' + VER;
 const PAGE = './index.html';
 
-/* 首屏完整就是这 7 个请求（合计 4.2MB，gzip 后约 740KB）。
- * 首次访问在后台预缓存，等用户下次打开时全部命中缓存，不再走网络。 */
-const PRECACHE = [
-  './',
-  PAGE,
-  './vditor/dist/index.min.js',
-  './vditor/dist/index.css',
-  './vditor/dist/js/lute/lute.min.js',
-  './vditor/dist/js/icons/ant.js',
-  './vditor/dist/js/i18n/zh_CN.js',
-  './vditor/dist/css/content-theme/light.css',
-];
+const PRECACHE = ['./', PAGE];
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
