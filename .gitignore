@@ -1,0 +1,12 @@
+# 依赖本机工具链的项目数据 / 测试脚本，不参与部署
+.workbuddy/
+*.log
+
+# 根目录的过程截图与实验页
+/*.png
+vditor-probe.html
+vd-wys.html
+
+# 系统垃圾
+.DS_Store
+Thumbs.db

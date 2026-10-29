@@ -1,0 +1,4203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DK NOTE</title>
+<style>
+/* ================= 设计令牌（对齐 Orca Note） ================= */
+:root{
+  --gray-1:#f7f7f8; --gray-2:#efeff0; --gray-3:#e3e3e5; --gray-4:#c9c9cd;
+  --gray-5:#a0a0a8; --gray-6:#77777f; --gray-7:#4a4a52; --gray-8:#35353b; --gray-9:#232328;
+  --primary:#0b6bcb; --primary-weak:#e8f1fb; --danger:#d64545; --ok:#2f9e63;
+  --sidebar-bg:#2c2c31; --sidebar-text:#e8e8ea; --sidebar-text-2:#9a9aa3;
+  --sidebar-hover:#3a3a41; --sidebar-active:#484852;
+  --content-bg:#fff; --content-text:#1f1f24; --content-text-2:#77777f;
+  --border:#e3e3e5; --radius-sm:4px; --radius-md:8px;
+  --font-ui:-apple-system,"Segoe UI","Microsoft YaHei UI","PingFang SC","Noto Sans SC",sans-serif;
+  --font-mono:"Cascadia Code",Consolas,"JetBrains Mono",monospace;
+}
+body.dark{
+  --content-bg:#1e1e22; --content-text:#e6e6e8; --content-text-2:#9a9aa3;
+  --border:#35353b; --gray-1:#26262b; --gray-2:#2e2e34; --gray-3:#3a3a41;
+  --gray-4:#55555e; --gray-9:#111114; --primary-weak:#1d2f45;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:var(--font-ui);color:var(--content-text);background:var(--gray-2);overflow:hidden}
+#app{display:flex;height:100vh}
+
+/* ================= 侧栏 ================= */
+#sidebar{width:272px;min-width:272px;background:var(--sidebar-bg);color:var(--sidebar-text);
+  display:flex;flex-direction:column;z-index:10;box-shadow:2px 0 12px rgba(0,0,0,.08);transition:margin-left .18s ease}
+#sidebar.collapsed{margin-left:-272px}
+.side-head{display:flex;align-items:center;gap:2px;padding:10px 10px 2px}
+#main .icon-btn:hover{background:var(--gray-2)}
+.icon-btn{border:none;background:transparent;color:inherit;font-size:15px;width:28px;height:28px;
+  border-radius:var(--radius-sm);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+.icon-btn:hover{background:var(--sidebar-hover)}
+.icon-btn:disabled{opacity:.35;cursor:default;background:transparent}
+/* 顶栏图标：统一 16px 线性 SVG，颜色跟随文字色 */
+.icon-btn svg{display:block;pointer-events:none}
+.icon-btn svg.rot{transition:transform .14s ease}
+.bottom-panel:not(.collapsed) #btn-bp-toggle svg.rot{transform:rotate(180deg)}
+.side-spacer{flex:1}
+
+/* 日历 */
+.calendar{padding:8px 12px 6px;user-select:none}
+.cal-header{display:flex;align-items:center;gap:2px;margin-bottom:6px}
+.cal-title{font-size:13px;font-weight:600;letter-spacing:.2px;white-space:nowrap;display:flex;align-items:center;gap:2px}
+.cal-title .cal-btn{cursor:pointer;padding:1px 3px;border-radius:3px}
+.cal-title .cal-btn:hover{background:var(--sidebar-hover)}
+.cal-today-btn{border:none;background:transparent;color:var(--sidebar-text-2);
+  font-size:12px;font-weight:400;padding:2px 6px;border-radius:var(--radius-sm);cursor:pointer}
+.cal-today-btn:hover{background:var(--sidebar-hover);color:var(--sidebar-text)}
+.cal-grid{display:grid;grid-template-columns:20px repeat(7,1fr);gap:1px;font-size:11px}
+.cal-cell{height:23px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);position:relative;color:var(--sidebar-text)}
+.cal-cell.head{color:var(--sidebar-text-2);font-size:10px;height:20px}
+.cal-cell.weeknum{color:var(--sidebar-text-2);font-size:9.5px;opacity:.75}
+.cal-cell.day{cursor:pointer}
+.cal-cell.day:hover{background:var(--sidebar-hover)}
+.cal-cell.day.other{color:var(--sidebar-text-2);opacity:.5}
+.cal-cell.day .num{width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.cal-cell.day.today .num{outline:1.5px solid #4ecdc4;outline-offset:0}
+.cal-cell.day.selected .num{background:var(--primary);color:#fff;outline:none}
+.cal-cell .dot{position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--sidebar-text-2)}
+.cal-cell.selected .dot{background:#fff}
+
+/* 分段页签 + 列表 */
+.seg-tabs{display:flex;background:rgba(255,255,255,.06);border-radius:var(--radius-sm);padding:2px;margin:2px 12px 8px}
+.seg-item{flex:1;border:none;background:transparent;color:var(--sidebar-text-2);font-size:12px;padding:5px 0;border-radius:3px;cursor:pointer}
+.seg-item.selected{background:rgba(255,255,255,.12);color:var(--sidebar-text)}
+.side-scroll{flex:1;overflow-y:auto;min-height:0;padding:0 10px}
+/* 侧栏页脚：应用名 + 版本 */
+.side-foot{display:flex;align-items:baseline;gap:6px;padding:9px 14px 11px;
+  border-top:1px solid rgba(255,255,255,.07);user-select:none;flex-shrink:0}
+.side-foot .sf-name{font-size:11.5px;font-weight:600;letter-spacing:.9px;color:var(--sidebar-text);opacity:.82}
+.side-foot .sf-ver{font-size:10px;letter-spacing:.3px;color:var(--sidebar-text-2);opacity:.72}
+.note-list,.tag-list{list-style:none;margin:0;padding:0}
+.note-item,.tag-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:var(--radius-sm);
+  cursor:pointer;font-size:13px;color:var(--sidebar-text);position:relative}
+.note-item:hover,.tag-item:hover{background:var(--sidebar-hover)}
+.note-item.active{background:var(--sidebar-active)}
+.note-item .n-icon{opacity:.8;font-size:12px;width:14px;text-align:center}
+.note-item .n-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.note-item .n-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.35}
+.note-item .n-snip{font-size:11px;line-height:1.35;color:var(--sidebar-text);opacity:.66;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 搜索命中高亮（侧栏是深色底，不用默认的黄色底） */
+.note-item mark{background:rgba(232,196,90,.26);color:#ffe9a8;border-radius:2px;padding:0 1px}
+.note-item .n-more{opacity:0;border:none;background:transparent;color:var(--sidebar-text-2);cursor:pointer;
+  font-size:13px;width:20px;height:20px;border-radius:3px;line-height:1}
+.note-item:hover .n-more{opacity:1}
+.note-item .n-more:hover{background:rgba(255,255,255,.14);color:#fff}
+.tag-item .t-count{margin-left:auto;font-size:10px;color:var(--sidebar-text-2)}
+.empty-tip{padding:10px 8px;font-size:12px;color:var(--sidebar-text-2);opacity:.8}
+
+.filter-bar{display:flex;align-items:center;gap:6px;margin:0 0 6px;padding:5px 8px;border-radius:var(--radius-sm);
+  background:rgba(255,255,255,.08);font-size:12px;color:var(--sidebar-text)}
+.filter-bar.hidden{display:none}
+.filter-bar .fb-tag{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filter-bar button{border:none;background:transparent;color:var(--sidebar-text-2);cursor:pointer;font-size:12px;
+  width:18px;height:18px;border-radius:3px;line-height:1}
+.filter-bar button:hover{background:rgba(255,255,255,.14);color:#fff}
+.note-item .n-fav{margin-left:auto;border:none;background:transparent;color:var(--sidebar-text-2);cursor:pointer;
+  font-size:12px;width:18px;height:18px;border-radius:3px;line-height:1;opacity:.42;padding:0}
+.note-item .n-fav.on{opacity:1;color:#e8c45a}
+.note-item .n-fav:hover{opacity:1;color:#e8c45a}
+
+/* ================= 主区 ================= */
+#main{flex:1;display:flex;flex-direction:column;background:var(--content-bg);min-width:0}
+.headbar{height:44px;display:flex;align-items:center;padding:0 14px;gap:10px;border-bottom:1px solid var(--border)}
+.search-box{display:flex;align-items:center;gap:6px;background:var(--gray-1);border:1px solid var(--border);
+  border-radius:6px;padding:4px 9px;width:260px}
+.search-box input{border:none;outline:none;background:transparent;font-size:12.5px;color:var(--content-text);width:100%;font-family:inherit}
+.search-box .search-ico{display:flex;color:var(--content-text-2);opacity:.62}
+.head-right{margin-left:auto;display:flex;gap:2px}
+
+.doc-head{padding:18px 44px 0}
+.title-row{display:flex;align-items:center;gap:8px;position:relative}
+.doc-title{flex:1;border:none;outline:none;background:transparent;font-size:26px;font-weight:700;
+  color:var(--content-text);font-family:inherit;padding:0;min-width:0}
+/* 日记：标题宽度贴合文字，好让「›」紧跟日期 */
+.doc-title.dated{flex:none;max-width:100%}
+.doc-title::placeholder{color:var(--gray-4)}
+/* 日期翻页：前一天悬挂在标题左侧（不占位，保证标题仍与正文左对齐），后一天紧跟日期 */
+.day-nav{border:none;background:transparent;color:var(--content-text-2);cursor:pointer;padding:0;
+  width:22px;height:22px;border-radius:var(--radius-sm);font-size:18px;line-height:1;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;transition:background .12s,color .12s}
+.day-nav:hover{background:var(--gray-2);color:var(--content-text)}
+.day-nav:active{background:var(--gray-3)}
+.day-nav.prev{position:absolute;left:-30px;top:50%;transform:translateY(-50%)}
+.day-nav.hidden{display:none}
+.wc-badge{font-size:11px;color:var(--content-text-2);background:var(--gray-2);padding:2px 8px;border-radius:10px;flex:none;
+  margin-left:auto;margin-right:2px;line-height:1.5}
+
+/* 标题下的标签条 */
+.doc-tags{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0 2px;min-height:24px;position:relative}
+.dt-label{font-size:11px;color:var(--content-text-2);flex:none}
+.dt-chips{display:flex;gap:5px;flex-wrap:wrap}
+.dt-chip{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;line-height:1;padding:4px 7px;
+  border-radius:11px;background:var(--gray-2);color:var(--content-text-2);cursor:pointer}
+.dt-chip:hover{background:var(--gray-3);color:var(--content-text)}
+.dt-chip .dt-x{font-size:11px;opacity:.55;padding:0 1px}
+.dt-chip .dt-x:hover{opacity:1}
+.dt-input{border:none;outline:none;background:transparent;font-size:11.5px;color:var(--content-text);
+  font-family:inherit;padding:3px 0;min-width:92px}
+.dt-input::placeholder{color:var(--gray-4)}
+/* 标签池建议：点一下才加到本篇 */
+.tag-suggest{position:absolute;left:0;top:100%;z-index:40;min-width:200px;max-width:320px;
+  background:var(--content-bg);border:1px solid var(--border);border-radius:var(--radius-md);
+  box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;max-height:220px;overflow-y:auto}
+.tag-suggest.hidden{display:none}
+.ts-item{display:flex;align-items:center;gap:8px;width:100%;border:none;background:transparent;
+  color:var(--content-text);font-size:12.5px;font-family:inherit;text-align:left;padding:5px 8px;
+  border-radius:var(--radius-sm);cursor:pointer}
+.ts-item:hover,.ts-item.on{background:var(--gray-2)}
+.ts-item .ts-count{margin-left:auto;font-size:10.5px;color:var(--content-text-2)}
+.ts-empty{padding:6px 8px;font-size:11.5px;color:var(--content-text-2);line-height:1.6}
+
+.editor-wrap{flex:1;display:flex;min-height:0}
+.editor-pane,.preview-pane{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto}
+.editor-pane.hidden,.preview-pane.hidden{display:none}
+.editor-wrap.split .editor-pane{border-right:1px solid var(--border)}
+.toolbar{display:flex;align-items:center;gap:2px;flex-wrap:wrap;padding:6px 40px 4px;position:sticky;top:0;background:var(--content-bg);z-index:2}
+.toolbar button{border:none;background:transparent;color:var(--content-text-2);font-size:12px;min-width:28px;height:26px;padding:0 6px;border-radius:var(--radius-sm);cursor:pointer}
+.toolbar button:hover{background:var(--gray-2);color:var(--content-text)}
+.toolbar button:disabled{opacity:.3;cursor:default}
+.toolbar button:disabled:hover{background:transparent;color:var(--content-text-2)}
+.toolbar button.on{background:var(--gray-2);color:var(--content-text)}
+.tb-sep{width:1px;height:16px;background:var(--border);margin:0 5px}
+/* 字色色板 */
+.tb-color-wrap{position:relative;display:inline-flex}
+.tb-palette{position:absolute;top:28px;left:0;z-index:40;display:grid;grid-template-columns:repeat(4,22px);gap:7px;
+  padding:8px;background:var(--content-bg);border:1px solid var(--border);border-radius:var(--radius-md);
+  box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.tb-palette.hidden{display:none}
+.tb-swatch{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.14);cursor:pointer;padding:0;min-width:0}
+.tb-swatch:hover{outline:2px solid var(--primary);outline-offset:1px}
+.tb-swatch.none{background:var(--content-bg);color:var(--content-text-2);font-size:11px;line-height:1;
+  display:flex;align-items:center;justify-content:center}
+/* 表格浮动工具条 */
+.tbl-bar{position:fixed;z-index:45;display:flex;align-items:center;gap:1px;padding:2px;
+  background:var(--content-bg);border:1px solid var(--border);border-radius:var(--radius-md);
+  box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.tbl-bar.hidden{display:none}
+.tbl-bar button{border:none;background:transparent;color:var(--content-text-2);font-size:11.5px;
+  height:24px;padding:0 7px;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit}
+.tbl-bar button:hover{background:var(--gray-2);color:var(--content-text)}
+.tbl-bar button.danger{color:var(--danger)}
+.tbl-bar button.danger:hover{background:rgba(214,69,69,.1);color:var(--danger)}
+.tbl-bar .tb-sep{margin:0 2px}
+/* 表格列宽拖拽：靠近列边界时的参考线 */
+.col-guide{position:fixed;left:0;top:0;width:2px;height:0;background:var(--primary);
+  opacity:0;pointer-events:none;z-index:60;transition:opacity .1s}
+.col-guide.on{opacity:.9}
+body.col-dragging{cursor:col-resize;user-select:none}
+body.col-dragging *{cursor:col-resize!important}
+/* 富文本编辑器：写作态直接显示排版结果，不显示 Markdown 标记 */
+.editor{flex:1;outline:none;padding:6px 44px 40px;font-family:var(--font-ui);
+  font-size:14.5px;line-height:1.85;color:var(--content-text);background:transparent;
+  min-height:200px;overflow-wrap:break-word;cursor:text;caret-color:var(--primary);word-break:break-word}
+.editor:empty::before,.editor.is-empty::before{content:attr(data-placeholder);color:var(--gray-4);pointer-events:none}
+.editor:focus{outline:none}
+.preview-pane{padding:0}
+.src-head{display:flex;align-items:center;gap:8px;padding:6px 40px 4px;font-size:11.5px;
+  color:var(--content-text-2);position:sticky;top:0;background:var(--content-bg);z-index:2}
+.src-hint{opacity:.75}
+.src-view{flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;
+  padding:2px 40px 40px;font-family:var(--font-mono);font-size:13.2px;line-height:1.8;
+  color:var(--content-text);min-height:200px}
+/* 编辑区与预览共用的排版 */
+:is(.preview-body,.editor){font-size:14.5px;line-height:1.85;overflow-wrap:break-word}
+:is(.preview-body,.editor) h1,:is(.preview-body,.editor) h2,:is(.preview-body,.editor) h3,
+:is(.preview-body,.editor) h4{margin:1em 0 .45em;line-height:1.35}
+:is(.preview-body,.editor) h1{font-size:1.7em}:is(.preview-body,.editor) h2{font-size:1.42em}
+:is(.preview-body,.editor) h3{font-size:1.2em}:is(.preview-body,.editor) h4{font-size:1.05em}
+:is(.preview-body,.editor) p{margin:.5em 0}
+:is(.preview-body,.editor) ul,:is(.preview-body,.editor) ol{padding-left:1.6em;margin:.45em 0}
+:is(.preview-body,.editor) li{margin:.12em 0}
+/* 无序列表各层都用实心圆点（浏览器默认会给二三级换成空心/方块，看着像换了一套格式） */
+:is(.preview-body,.editor) ul,
+:is(.preview-body,.editor) ul ul,
+:is(.preview-body,.editor) ul ul ul,
+:is(.preview-body,.editor) ul ul ul ul{list-style:disc}
+/* 有序列表多级序号：一级 1. / 二级 (1) / 三级 a. / 四级 i. */
+:is(.preview-body,.editor) ol{counter-reset:ol1}
+:is(.preview-body,.editor) ol > li{counter-increment:ol1}
+:is(.preview-body,.editor) ol ol{counter-reset:ol2;padding-left:2.15em}
+:is(.preview-body,.editor) ol ol > li{counter-increment:ol1 0 ol2}
+:is(.preview-body,.editor) ol ol ol{counter-reset:ol3;padding-left:2.3em}
+:is(.preview-body,.editor) ol ol ol > li{counter-increment:ol1 0 ol2 0 ol3}
+:is(.preview-body,.editor) ol ol ol ol{counter-reset:ol4;padding-left:2.5em}
+:is(.preview-body,.editor) ol ol ol ol > li{counter-increment:ol1 0 ol2 0 ol3 0 ol4}
+:is(.preview-body,.editor) ol > li::marker{content:counter(ol1) ". "}
+:is(.preview-body,.editor) ol ol > li::marker{content:"(" counter(ol2) ") "}
+:is(.preview-body,.editor) ol ol ol > li::marker{content:counter(ol3, lower-alpha) ". "}
+:is(.preview-body,.editor) ol ol ol ol > li::marker{content:counter(ol4, lower-roman) ". "}
+/* 子级列表（无序/有序混排）稍微缩进，层级一眼能看出 */
+:is(.preview-body,.editor) ul ul, :is(.preview-body,.editor) ul ol,
+:is(.preview-body,.editor) ol ul{padding-left:1.9em}
+:is(.preview-body,.editor) blockquote{margin:.55em 0;padding:2px 14px;border-left:3px solid var(--gray-4);color:var(--content-text-2)}
+:is(.preview-body,.editor) code{font-family:var(--font-mono);font-size:.88em;background:var(--gray-2);padding:1px 5px;border-radius:3px}
+:is(.preview-body,.editor) pre{background:var(--gray-9);color:var(--gray-1);padding:12px 14px;border-radius:var(--radius-md);overflow-x:auto;font-size:.86em;line-height:1.6;font-family:var(--font-mono);white-space:pre-wrap}
+:is(.preview-body,.editor) pre code{background:transparent;padding:0;color:inherit;font-size:1em}
+:is(.preview-body,.editor) a{color:var(--primary);text-decoration:none;cursor:pointer}
+:is(.preview-body,.editor) a:hover{text-decoration:underline}
+:is(.preview-body,.editor) a.wiki{color:var(--primary);background:var(--primary-weak);padding:0 3px;border-radius:3px}
+:is(.preview-body,.editor) hr{border:none;border-top:1px solid var(--border);margin:1.1em 0}
+:is(.preview-body,.editor) table{border-collapse:collapse;margin:.65em 0;width:100%;font-size:.94em;table-layout:fixed}
+:is(.preview-body,.editor) th,:is(.preview-body,.editor) td{border:1px solid var(--border);padding:5px 10px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
+:is(.preview-body,.editor) th{background:var(--gray-1)}
+:is(.preview-body,.editor) img{max-width:100%}
+/* 正文里的 #标签 */
+:is(.preview-body,.editor) .tag-chip{display:inline-block;font-size:.9em;line-height:1.5;padding:0 6px;border-radius:9px;
+  background:var(--gray-2);color:var(--content-text-2);cursor:pointer;text-decoration:none;user-select:all}
+:is(.preview-body,.editor) .tag-chip:hover{background:var(--gray-3);color:var(--content-text);text-decoration:none}
+/* 高亮（字体格式） */
+:is(.preview-body,.editor) mark{background:#fff2a8;color:inherit;padding:0 2px;border-radius:2px}
+body.dark :is(.preview-body,.editor) mark{background:#5c4a12;color:#f4e8c2}
+
+/* 底部引用面板：引用方（双链） */
+.bottom-panel{border-top:1px solid var(--border);background:var(--gray-1);display:flex;flex-direction:column;max-height:200px}
+.bp-head{display:flex;align-items:center;gap:2px;padding:4px 12px}
+.bp-tab{border:none;background:transparent;font-size:12px;color:var(--content-text-2);padding:4px 10px;border-radius:var(--radius-sm)}
+.bp-tab.active{background:var(--content-bg);color:var(--content-text);font-weight:600;box-shadow:0 0 0 1px var(--border)}
+/* WebDAV 本版本关闭：入口整体隐藏 */
+.dav-off{display:none!important}
+.bp-tools{margin-left:auto;display:flex;gap:2px}
+.bp-summary{font-size:12px;color:var(--content-text-2);padding-left:4px}
+.bottom-panel.collapsed .bp-body{display:none}
+.bottom-panel.collapsed .bp-tab{display:none}
+.bottom-panel:not(.collapsed) .bp-summary{display:none}
+.bp-body{flex:1;overflow-y:auto;padding:2px 14px 8px;font-size:12.5px}
+.bp-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:var(--radius-sm);cursor:pointer;color:var(--content-text)}
+.bp-row:hover{background:var(--gray-2)}
+.bp-empty{color:var(--content-text-2);font-size:12px;padding:4px 6px;line-height:1.6}
+.bp-create{color:var(--primary);cursor:pointer}
+
+.statusbar{height:24px;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:11px;
+  color:var(--content-text-2);border-top:1px solid var(--border);background:var(--gray-1);flex:none}
+.status-spacer{flex:1}
+#status-save.dirty{color:var(--danger)}
+#status-save.saved{color:var(--ok)}
+#status-sync{color:var(--primary)}
+
+/* ================= 菜单 / 弹窗 ================= */
+.menu{position:fixed;background:var(--content-bg);border:1px solid var(--border);border-radius:6px;
+  box-shadow:0 8px 24px rgba(0,0,0,.16);padding:4px;z-index:200;min-width:132px}
+.menu button{display:block;width:100%;text-align:left;border:none;background:transparent;font-size:12.5px;
+  padding:6px 10px;border-radius:4px;cursor:pointer;color:var(--content-text);font-family:inherit}
+.menu button:hover{background:var(--gray-2)}
+.menu button.danger{color:var(--danger)}
+
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.34);display:flex;align-items:center;justify-content:center;z-index:300}
+.modal-mask.hidden{display:none}
+.modal{width:440px;max-height:84vh;overflow-y:auto;background:var(--content-bg);border-radius:var(--radius-md);box-shadow:0 14px 44px rgba(0,0,0,.24)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--border);font-weight:600;font-size:14px}
+.modal-body{padding:14px 18px 20px}
+.modal-body h3{font-size:12.5px;margin:16px 0 8px;color:var(--content-text-2);font-weight:600}
+.modal-body h3:first-child,.modal-body > h3:first-of-type{margin-top:0}
+.modal-body label{display:block;font-size:12px;color:var(--content-text-2);margin-bottom:10px}
+.modal-body label.row{display:flex;align-items:center;gap:6px}
+.modal-body input:not([type="checkbox"]){display:block;width:100%;margin-top:4px;padding:7px 9px;
+  border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;outline:none;font-family:inherit;
+  background:var(--content-bg);color:var(--content-text)}
+.modal-body input:focus{border-color:var(--primary)}
+.modal-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.btn{
+  border:1px solid var(--border);background:var(--content-bg);color:var(--content-text);font-size:12.5px;
+  padding:6px 14px;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit}
+.btn:hover{background:var(--gray-1)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:hover{background:var(--content-bg)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.modal-status{font-size:12px;color:var(--content-text-2);min-height:18px;margin:4px 0}
+.modal-status.ok{color:var(--ok)}
+.modal-status.err{color:var(--danger)}
+.modal-hint{font-size:11px;line-height:1.6;color:var(--content-text-2);opacity:.85;margin:2px 0 6px}
+.hidden{display:none!important}
+
+/* 滚动条 */
+.side-scroll::-webkit-scrollbar,.editor::-webkit-scrollbar,.preview-pane::-webkit-scrollbar,
+.modal::-webkit-scrollbar,.bp-body::-webkit-scrollbar{width:8px}
+.side-scroll::-webkit-scrollbar-thumb{background:#4a4a52;border-radius:4px}
+.editor::-webkit-scrollbar-thumb,.preview-pane::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb,.bp-body::-webkit-scrollbar-thumb{background:var(--gray-4);border-radius:4px}
+
+/* ================= 双栏：同时显示 / 编辑连续两天 ================= */
+.panes{flex:1;display:flex;min-height:0;min-width:0}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;position:relative}
+.pane.hidden{display:none}
+.panes.splitting .pane + .pane{border-left:1px solid var(--border)}
+/* 非活动窗格淡一档底色 + 标题转灰：一眼看出正在改哪一边 */
+.pane.dim{background:var(--gray-2)}
+.pane.dim .toolbar,.pane.dim .src-head{background:var(--gray-2)}
+.pane.dim .doc-title{color:var(--content-text-2)}
+/* 分栏后每列变窄：收留白、缩标题、工具栏按需换行 */
+.panes.splitting .doc-head{padding:14px 20px 0}
+.panes.splitting .doc-title{font-size:21px}
+.panes.splitting .day-nav.prev{left:-22px;width:19px}
+.panes.splitting .toolbar{padding:6px 16px 4px;row-gap:2px}
+.panes.splitting .editor{padding:4px 20px 32px}
+.panes.splitting .src-head{padding:6px 16px 4px}
+.panes.splitting .src-view{padding:2px 20px 32px}
+#btn-day-split.on{background:var(--gray-2);color:var(--primary)}
+/* 侧栏：另一栏正在显示的那篇，给一个更浅的底 */
+.note-item.open{background:rgba(255,255,255,.05)}
+
+/* 窄屏 */
+/* 窄屏：侧栏改浮层抽屉，默认收起；打开时内容区加遮罩 */
+#side-mask{position:fixed;top:0;right:0;bottom:0;left:272px;background:rgba(0,0,0,.3);
+  z-index:9;opacity:0;pointer-events:none;transition:opacity .18s;display:none}
+@media (max-width:820px){
+  #sidebar{position:absolute;height:100%;left:0;box-shadow:6px 0 24px rgba(0,0,0,.28)}
+  #main{min-width:0}
+  #side-mask{display:block}
+  #side-mask.show{opacity:1;pointer-events:auto}
+  .search-box{width:150px}
+  .doc-head,.editor,.preview-pane{padding-left:20px;padding-right:20px}
+  .toolbar{padding-left:20px;padding-right:74px;flex-wrap:wrap;row-gap:2px}
+  /* 窄屏工具栏会换行，字数固定在第一行右端，避免独占一整行 */
+  .wc-badge{position:absolute;right:20px;top:8px;margin:0}
+  .day-nav.prev{left:-22px}
+  /* 窄屏放两列太挤：双栏改成上下两段 */
+  .panes.splitting{flex-direction:column}
+  .panes.splitting .pane + .pane{border-left:none;border-top:1px solid var(--border)}
+  .panes.splitting .toolbar{padding-left:20px;padding-right:74px}
+  .panes.splitting .doc-head{padding-left:20px;padding-right:20px}
+  .panes.splitting .editor{padding-left:20px;padding-right:20px}
+}
+@media (max-width:620px){
+  .search-box{display:none}
+  .doc-head,.editor,.preview-pane{padding-left:16px;padding-right:16px}
+  .toolbar{padding-left:16px;padding-right:70px}
+  .wc-badge{right:16px}
+  .day-nav.prev{left:-19px;width:19px}
+  .panes.splitting .toolbar{padding-left:16px;padding-right:70px}
+  .panes.splitting .doc-head,.panes.splitting .editor{padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ============ 左侧栏 ============ -->
+  <aside id="sidebar">
+    <div class="side-head">
+      <button id="btn-collapse" class="icon-btn" title="收起侧栏" aria-label="收起侧栏">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="3.2" width="11.6" height="9.6" rx="1.6"/><path d="M6.2 3.2v9.6"/></svg>
+      </button>
+      <div class="side-spacer"></div>
+      <button id="btn-settings-side" class="icon-btn" title="设置" aria-label="设置">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 5.3h4.2M9.4 5.3h4M2.6 10.7h2.4M8.2 10.7h5.2"/><circle cx="8.1" cy="5.3" r="1.5"/><circle cx="6.4" cy="10.7" r="1.5"/></svg>
+      </button>
+    </div>
+
+    <section class="calendar">
+      <div class="cal-header">
+        <div class="cal-title">
+          <span class="cal-btn" id="cal-prev">‹</span>
+          <span id="cal-year"></span>年<span id="cal-month"></span>月
+          <button id="cal-today" class="cal-today-btn">当前</button>
+          <span class="cal-btn" id="cal-next">›</span>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </section>
+
+    <div class="seg-tabs">
+      <button class="seg-item" data-tab="fav" title="只看收藏（再点一次回到全部）">收藏</button>
+      <button class="seg-item" data-tab="tags" title="按标签浏览（再点一次回到全部）">标签</button>
+    </div>
+
+    <div class="side-scroll">
+      <div class="filter-bar hidden" id="filter-bar">
+        <span class="fb-tag" id="filter-label"></span>
+        <button id="filter-clear" title="清除筛选">✕</button>
+      </div>
+      <ul class="note-list" id="note-list"></ul>
+      <ul class="tag-list hidden" id="tag-list"></ul>
+    </div>
+
+    <div class="side-foot"><span class="sf-name">DK NOTE</span><span class="sf-ver">v0.1</span></div>
+  </aside>
+
+  <!-- ============ 主区 ============ -->
+  <main id="main">
+    <header class="headbar">
+      <button id="btn-open-sidebar" class="icon-btn hidden" title="显示侧栏" aria-label="显示侧栏">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="3.2" width="11.6" height="9.6" rx="1.6"/><path d="M6.2 3.2v9.6"/></svg>
+      </button>
+      <div class="search-box">
+        <span class="search-ico" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.1"/><path d="M10.1 10.1L13.4 13.4"/></svg>
+        </span>
+        <input id="search" placeholder="搜索正文内容…" title="空格分隔多个关键词 · 回车打开第一条 · Esc 清空" />
+      </div>
+      <div class="head-right">
+        <button id="btn-day-split" class="icon-btn" title="双栏：同时编辑连续两天 (Ctrl+Shift+D)" aria-label="双栏">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="1.9" y="3.1" width="5.3" height="9.8" rx="1.2"/><rect x="8.8" y="3.1" width="5.3" height="9.8" rx="1.2"/></svg>
+        </button>
+        <button id="btn-view" class="icon-btn" title="只读预览 / 写作 (Ctrl+E)" aria-label="切换视图">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M1.9 8S4.4 3.9 8 3.9 14.1 8 14.1 8 11.6 12.1 8 12.1 1.9 8 1.9 8Z"/><circle cx="8" cy="8" r="1.75"/></svg>
+        </button>
+        <button id="btn-save" class="icon-btn" title="保存 (Ctrl+S)" aria-label="保存">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M3.1 2.9h6.7l2.9 2.9v7.3H3.1V2.9Z"/><path d="M5.4 2.9v3.1h4.2V2.9"/><path d="M5.4 13.1V9.3h5.2v3.8"/></svg>
+        </button>
+        <button id="btn-theme" class="icon-btn" title="切换明暗主题" aria-label="切换主题">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.3"/><path d="M8 2.7a5.3 5.3 0 0 0 0 10.6Z" fill="currentColor" stroke="none"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 窗格：单栏时只有 A；双栏时右侧克隆出 B，两栏各自独立编辑 -->
+    <div class="panes" id="panes">
+      <section class="pane" id="pane-a">
+    <div class="doc-head">
+      <div class="title-row">
+        <button id="btn-prev-day" class="day-nav prev hidden" title="前一天" tabindex="-1">‹</button>
+        <input id="doc-title" class="doc-title" placeholder="无标题" spellcheck="false" />
+        <button id="btn-next-day" class="day-nav hidden" title="后一天" tabindex="-1">›</button>
+      </div>
+      <div class="doc-tags" id="doc-tags">
+        <span class="dt-label">标签</span>
+        <span class="dt-chips" id="dt-chips"></span>
+        <input id="dt-input" class="dt-input" placeholder="＋ 添加标签" spellcheck="false" />
+        <div class="tag-suggest hidden" id="tag-suggest"></div>
+      </div>
+    </div>
+
+    <div class="editor-wrap" id="editor-wrap">
+      <div class="editor-pane" id="editor-pane">
+        <div class="toolbar" id="toolbar">
+          <button id="btn-undo" class="tb-act" title="撤回 (Ctrl+Z)" disabled>↶</button>
+          <button id="btn-redo" class="tb-act" title="重做 (Ctrl+Shift+Z)" disabled>↷</button>
+          <span class="tb-sep"></span>
+          <button data-fmt="h1" title="一级标题">H1</button><button data-fmt="h2" title="二级标题">H2</button><button data-fmt="h3" title="三级标题">H3</button>
+          <button data-fmt="p" title="正文（取消标题 / 列表 / 引用）">正文</button>
+          <span class="tb-sep"></span>
+          <button data-fmt="bold" title="加粗 (Ctrl+B)"><b>B</b></button><button data-fmt="italic" title="斜体 (Ctrl+I)"><i>I</i></button>
+          <button data-fmt="strike" title="删除线"><s>S</s></button><button data-fmt="code" title="行内代码">{ }</button>
+          <span class="tb-color-wrap">
+            <button data-fmt="color" id="btn-color" title="字体颜色">A</button>
+            <span class="tb-palette hidden" id="tb-palette"></span>
+          </span>
+          <button data-fmt="mark" title="高亮文字"><span style="background:#fff2a8;padding:0 2px">▨</span></button>
+          <span class="tb-sep"></span>
+          <button data-fmt="ul" title="无序列表（或输入 “- ”）">•≡</button><button data-fmt="ol" title="有序列表（或输入 “1. ”）">1≡</button>
+          <button data-fmt="quote" title="引用（或输入 “&gt; ”）">❯</button><button data-fmt="link" title="链接">🔗</button>
+          <button data-fmt="tag" title="标签（也可直接输入 #标签）">#</button>
+          <button data-fmt="wiki" title="双链 [[笔记标题]]">[[ ]]</button>
+          <button data-fmt="codeblock" title="代码块">``</button><button data-fmt="table" title="表格">▦</button>
+          <span class="wc-badge" id="wc-badge" title="字数">0</span>
+        </div>
+        <div id="editor" class="editor" contenteditable="true" spellcheck="false"
+          data-placeholder="开始书写…（# 加空格变标题，- 或 1. 变列表，&gt; 变引用）"></div>
+      </div>
+      <div class="preview-pane hidden" id="preview-pane">
+        <div class="src-head"><span>Markdown 源码</span><span class="src-hint">可直接编辑，自动同步回富文本</span></div>
+        <textarea id="src-view" class="src-view" spellcheck="false"></textarea>
+      </div>
+    </div>
+      </section>
+    </div>
+
+    <div class="bottom-panel collapsed" id="bottom-panel">
+      <div class="bp-head">
+        <span class="bp-tab active" id="bp-tab-backlinks" title="有哪些笔记引用了本篇（在别的笔记里写 [[本篇标题]]）">引用方</span>
+        <span class="bp-summary" id="bp-summary"></span>
+        <div class="bp-tools">
+          <button id="btn-bp-toggle" class="icon-btn" title="展开 / 折叠" aria-label="展开或折叠引用面板">
+            <svg class="rot" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4-4 4 4"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="bp-body" id="bp-body"></div>
+    </div>
+
+    <footer class="statusbar">
+      <span id="status-text">就绪</span>
+      <span class="status-spacer"></span>
+      <span id="status-save">未修改</span>
+      <span id="status-sync"></span>
+    </footer>
+  </main>
+</div>
+
+<!-- 设置弹窗 -->
+<div class="modal-mask hidden" id="modal-settings">
+  <div class="modal">
+    <div class="modal-head"><span>设置</span><button class="icon-btn" id="btn-close-settings">✕</button></div>
+    <div class="modal-body">
+      <!-- WebDAV：本版本不做，整块隐藏（代码保留，后续直接去掉 class="dav-off" 即可恢复） -->
+      <div class="dav-off">
+        <h3>WebDAV 同步</h3>
+        <label>服务器地址<input id="set-dav-url" placeholder="https://dav.example.com/dav/notes/" /></label>
+        <label>用户名<input id="set-dav-user" placeholder="用户名" /></label>
+        <label>密码<input id="set-dav-pass" type="password" placeholder="密码 / 应用专用密码" /></label>
+        <label class="row"><input type="checkbox" id="set-dav-auto" /> 保存时自动上传</label>
+        <div class="modal-row">
+          <button id="btn-dav-test" class="btn">测试连接</button>
+          <button id="btn-dav-up" class="btn">上传全部</button>
+          <button id="btn-dav-down" class="btn">下载合并</button>
+        </div>
+        <div class="modal-hint">浏览器直连 WebDAV 需服务端支持 CORS；桌面客户端无此限制。下载合并仅在远端较新时覆盖本地。</div>
+        <div id="dav-status" class="modal-status"></div>
+      </div>
+
+      <h3>编辑器</h3>
+      <label class="row"><input type="checkbox" id="set-split" /> 常驻分栏（右侧对照 Markdown 源码）</label>
+      <label class="row"><input type="checkbox" id="set-monday" checked /> 周一作为一周起始</label>
+
+      <h3>数据</h3>
+      <div class="modal-row">
+        <button id="btn-import-settings" class="btn">导入 / 恢复…</button>
+        <button id="btn-export-settings" class="btn">导出备份 (.zip)</button>
+        <button id="btn-clear" class="btn danger">清空本地数据</button>
+      </div>
+      <div class="modal-hint">导出会把全部笔记打成一个带时间戳的 zip 压缩包。导入支持该压缩包，也支持零散的 .md 文件；同名笔记以导入内容为准。</div>
+      <div class="modal-hint" id="storage-hint"></div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-import" accept=".md,.markdown,.zip,text/markdown,application/zip" multiple hidden />
+
+<!-- 窄屏打开侧栏时的内容遮罩 -->
+<div id="side-mask"></div>
+
+<!-- 表格浮动工具条：光标在表格内时出现 -->
+<div class="tbl-bar hidden" id="tbl-bar">
+  <button data-tbl="row-add" title="在下方插入一行">＋行</button>
+  <button data-tbl="col-add" title="在右侧插入一列">＋列</button>
+  <span class="tb-sep"></span>
+  <button data-tbl="row-del" title="删除当前行">－行</button>
+  <button data-tbl="col-del" title="删除当前列">－列</button>
+  <span class="tb-sep"></span>
+  <button data-tbl="table-del" class="danger" title="删除整个表格（Ctrl+Z 可撤回）">删表</button>
+</div>
+<!-- 拖动列宽时的竖向参考线 -->
+<div class="col-guide" id="col-guide"></div>
+
+<script>
+/* =====================================================================
+   DK NOTE v0.1 — 单文件版（无模块依赖，双击 file:// 亦可运行）
+   ===================================================================== */
+(function () {
+  'use strict';
+
+  /* 本版本关闭的能力。改回 true 并去掉设置里那段 class="dav-off" 即可恢复入口 */
+  const FEATURES = { webdav: false };
+
+  /* ---------------- 工具 ---------------- */
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, '0');
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const journalName = (d) => dayKey(d) + '.md';
+  function parseJournalName(name) {
+    const m = String(name).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // 空白日记：文件存在但没有任何内容（不算“有笔记”）
+  function isBlankJournal(n) {
+    return !!parseJournalName(n.name) && !String(n.content || '').trim();
+  }
+  function isoWeek(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d - ys) / 86400000 + 1) / 7);
+  }
+
+  /* ---------------- Markdown ---------------- */
+  function inline(text, noteResolver) {
+    // 字体颜色 / 高亮写成行内 HTML，先摘出来以免被转义
+    const stash = [];
+    const keep = (html) => { stash.push(html); return '\x00T' + (stash.length - 1) + '\x00'; };
+    let raw = String(text);
+    raw = raw.replace(/<span\s+style="color:([^"]+)"\s*>([\s\S]*?)<\/span>/gi, (m, col, inner) => {
+      const c = String(col).trim();
+      if (!/^[#a-zA-Z0-9(),.%\s]+$/.test(c)) return m;   // 不是颜色值就按普通文本处理
+      return keep('<span data-color="' + c + '" style="color:' + c + '">' + inline(inner) + '</span>');
+    });
+    raw = raw.replace(/<mark>([\s\S]*?)<\/mark>/gi, (m, inner) => keep('<mark>' + inline(inner) + '</mark>'));
+
+    let s = esc(raw);
+    const codes = [];
+    s = s.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return '\x00C' + (codes.length - 1) + '\x00'; });
+    // 双链 [[笔记名]]
+    s = s.replace(/\[\[([^\]]+)\]\]/g, (_, n) => `<a href="#" class="wiki" data-wiki="${esc(n)}">${esc(n)}</a>`);
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<img src="$2" alt="$1" />');
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    // #标签（前面需为行首/空白/中文括号，避免误伤 URL 锚点）
+    s = s.replace(/(^|[\s(（])#([^\s#，。,;；!！?？'"）)\]]{1,40})/g,
+      (_, pre, t) => pre + '<span class="tag-chip" data-tag="' + esc(t) + '">#' + esc(t) + '</span>');
+    s = s.replace(/\x00C(\d+)\x00/g, (_, i) => '<code>' + codes[+i] + '</code>');
+    s = s.replace(/\x00T(\d+)\x00/g, (_, i) => stash[+i]);
+    return s;
+  }
+
+  function renderMd(src) {
+    const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (/^```/.test(line)) {
+        const lang = line.slice(3).trim();
+        const buf = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        out.push('<pre><code' + (lang ? ' class="lang-' + esc(lang) + '"' : '') + '>' +
+          esc(buf.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      const h = line.match(/^(#{1,6})\s+(.*)$/);
+      if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+
+      if (/^[\s\-*_]+$/.test(line) && /^\s*([-*_])\s*\1\s*\1/.test(line)) { out.push('<hr />'); i++; continue; }
+
+      if (/^>\s?/.test(line)) {
+        const buf = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, '')); i++; }
+        // 引用内空行表示一个空段落；连续空行按一个算
+        const parts = [[]];
+        buf.forEach(l => {
+          if (!l.trim()) { if (parts[parts.length - 1].length) parts.push([]); }
+          else parts[parts.length - 1].push(l);
+        });
+        const body = parts.filter(p => p.length).map(p => renderMd(p.join('\n'))).join('');
+        out.push('<blockquote>' + (body || '<p><br /></p>') + '</blockquote>');
+        continue;
+      }
+
+      if (/^\|(.+)\|\s*$/.test(line) && i + 1 < lines.length && /^\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+        const head = line.split('|').slice(1, -1).map(c => c.trim());
+        i += 2;
+        const rows = [];
+        while (i < lines.length && /^\|(.+)\|\s*$/.test(lines[i])) {
+          rows.push(lines[i].split('|').slice(1, -1).map(c => c.trim())); i++;
+        }
+        let t = '<table>';
+        // 紧跟表格的列宽注释（拖动列边界时写入）
+        const wm = (lines[i] || '').match(/^\s*<!--\s*tbw:\s*([\d.,\s]+?)\s*-->\s*$/);
+        if (wm) {
+          const ws = wm[1].split(',').map(v => parseFloat(v)).filter(v => v > 0);
+          if (ws.length === head.length) {
+            const sum = ws.reduce((a, b) => a + b, 0) || 1;
+            t += '<colgroup>' + ws.map(v => '<col style="width:' + (v / sum * 100).toFixed(2) + '%">').join('') + '</colgroup>';
+            i++;
+          }
+        }
+        t += '<thead><tr>' + head.map(c => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>';
+        rows.forEach(r => { t += '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>'; });
+        out.push(t + '</tbody></table>');
+        continue;
+      }
+
+      if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) {
+          const m = lines[i].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
+          items.push({ indent: m[1].length, ordered: /\d/.test(m[2]), num: parseInt(m[2], 10) || 1, text: m[3] }); i++;
+        }
+        normalizeListItems(items);
+        out.push(buildList(items, 0).html);
+        continue;
+      }
+
+      if (/^\s*$/.test(line)) {
+        let n = 0;
+        while (i < lines.length && /^\s*$/.test(lines[i])) { n++; i++; }
+        // 第 1 个空行只是块间分隔，多出来的每个空行对应用户留下的一个空段落
+        const extra = i < lines.length ? Math.min(n - 1, 20) : 0;
+        for (let k = 0; k < extra; k++) out.push('<p><br /></p>');
+        continue;
+      }
+
+      const buf = [line]; i++;
+      while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+        !/^(#{1,6}\s|```|>|\s*([-*+]|\d+[.)])\s+|\|)/.test(lines[i])) { buf.push(lines[i]); i++; }
+      out.push('<p>' + inline(buf.join('\n')).replace(/\n/g, '<br />') + '</p>');
+    }
+    return out.join('\n');
+  }
+
+  // 把任意缩进（2 空格、3 空格、Tab 展开后的空格）归一到「层级 × 2」，
+  // 否则奇数缩进会让 buildList 找不到匹配层级而死循环
+  function normalizeListItems(items) {
+    const stack = [];
+    items.forEach(it => {
+      while (stack.length && it.indent < stack[stack.length - 1]) stack.pop();
+      if (!stack.length || it.indent > stack[stack.length - 1]) stack.push(it.indent);
+      it.indent = (stack.length - 1) * 2;
+    });
+  }
+  // olDepth：祖先里有序列表的个数，用来对上 CSS 的 ol1/ol2/ol3 计数器
+  function buildList(items, level, olDepth) {
+    const ordered = items[0].ordered;
+    const tag = ordered ? 'ol' : 'ul';
+    const myDepth = (olDepth || 0) + (ordered ? 1 : 0);
+    const startNum = ordered ? (items[0].num || 1) : 1;
+    // md 里首项写成 5. 时，列表从 5 开始编号（counter-reset 从 start-1 起）
+    const attrs = ordered && startNum > 1
+      ? ' start="' + startNum + '" style="counter-reset:ol' + myDepth + ' ' + (startNum - 1) + '"'
+      : '';
+    let html = '<' + tag + attrs + '>';
+    let idx = 0;
+    while (idx < items.length) {
+      const cur = items[idx];
+      if (cur.indent < level * 2) break;
+      if (cur.indent > level * 2) {
+        const sub = buildList(items.slice(idx), level + 1, myDepth);
+        if (!sub.count) break; // 缩进异常时兜底，避免无限递归
+        html = html.replace(/<\/li>$/, sub.html + '</li>');
+        idx += sub.count;
+        continue;
+      }
+      html += '<li>' + inline(cur.text);
+      const next = items[idx + 1];
+      if (next && next.indent > cur.indent) {
+        const sub = buildList(items.slice(idx + 1), level + 1, myDepth);
+        html += sub.html; idx += sub.count + 1; html += '</li>';
+      } else { html += '</li>'; idx++; }
+    }
+    return { html: html + '</' + tag + '>', count: idx };
+  }
+
+  /* ---------------- HTML → Markdown（富文本编辑器回写） ---------------- */
+  const BLOCKS = /^(H[1-6]|P|DIV|UL|OL|LI|BLOCKQUOTE|PRE|HR|TABLE)$/;
+  function hasBlockChild(el) {
+    return Array.from(el.children || []).some(c => BLOCKS.test(c.tagName));
+  }
+  function inlineToMd(node) {
+    let s = '';
+    Array.from(node.childNodes || []).forEach(c => {
+      if (c.nodeType === 3) { s += c.textContent; return; }
+      if (c.nodeType !== 1) return;
+      const t = c.tagName.toLowerCase();
+      if (t === 'br') { s += '\n'; return; }
+      if (t === 'strong' || t === 'b') { const i = inlineToMd(c); s += i ? '**' + i + '**' : ''; return; }
+      if (t === 'em' || t === 'i') { const i = inlineToMd(c); s += i ? '*' + i + '*' : ''; return; }
+      if (t === 'del' || t === 's' || t === 'strike') { const i = inlineToMd(c); s += i ? '~~' + i + '~~' : ''; return; }
+      if (t === 'code') { s += '`' + c.textContent.replace(/`/g, '') + '`'; return; }
+      if (t === 'a') {
+        if (c.dataset.wiki) { s += '[[' + c.dataset.wiki + ']]'; return; }
+        const inner = inlineToMd(c) || c.getAttribute('href') || '';
+        s += '[' + inner + '](' + (c.getAttribute('href') || '') + ')';
+        return;
+      }
+      if (t === 'span' && c.dataset.tag) { s += '#' + c.dataset.tag; return; }
+      if (t === 'span' && (c.dataset.color || (c.style && c.style.color))) {
+        // 字体颜色用行内 HTML 表达，Markdown 本身没有颜色语法
+        const col = c.dataset.color || c.style.color;
+        s += '<span style="color:' + col + '">' + inlineToMd(c) + '</span>';
+        return;
+      }
+      if (t === 'mark') { s += '<mark>' + inlineToMd(c) + '</mark>'; return; }
+      if (t === 'img') { s += '![' + (c.alt || '') + '](' + (c.getAttribute('src') || '') + ')'; return; }
+      s += inlineToMd(c);
+    });
+    return s;
+  }
+  function listToMd(list, out, indent, ordered) {
+    // <ol start="5"> 要写成 5. 6. 7.，否则重新打开会从 1 重新编号
+    let n = (ordered && parseInt(list.getAttribute('start'), 10)) || 1;
+    Array.from(list.children).forEach(li => {
+      if (li.tagName !== 'LI') return;
+      const subs = [];
+      const holder = document.createElement('div');
+      Array.from(li.childNodes).forEach(c => {
+        if (c.nodeType === 1 && /^(UL|OL)$/i.test(c.tagName)) subs.push(c);
+        else holder.appendChild(c.cloneNode(true));
+      });
+      const text = inlineToMd(holder).replace(/\n+/g, ' ').trim();
+      out.push(' '.repeat(indent) + (ordered ? (n++) + '. ' : '- ') + text);
+      subs.forEach(s => listToMd(s, out, indent + 2, /^OL$/i.test(s.tagName)));
+    });
+  }
+  function tableToMd(table, out) {
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if (!rows.length) return;
+    const cells = (r) => Array.from(r.children)
+      .map(c => inlineToMd(c).replace(/\n/g, ' ').replace(/\|/g, '\\|').trim());
+    const head = cells(rows[0]);
+    out.push('| ' + head.join(' | ') + ' |');
+    out.push('| ' + head.map(() => '---').join(' | ') + ' |');
+    rows.slice(1).forEach(r => out.push('| ' + cells(r).join(' | ') + ' |'));
+    // 手动拖过的列宽：紧跟表格写一行 HTML 注释（标准渲染器不可见），
+    // 等分时不写，保持 md 干净
+    const cg = table.querySelector(':scope > colgroup');
+    if (cg && head.length > 1 && cg.children.length === head.length) {
+      const ws = Array.from(cg.children).map(c => parseFloat(c.style.width) || 0);
+      const even = 100 / head.length;
+      if (ws.every(v => v > 0) && ws.some(v => Math.abs(v - even) > 0.6)) {
+        out.push('<!--tbw:' + ws.map(v => Math.round(v * 10) / 10).join(',') + '-->');
+      }
+    }
+  }
+  function blockToMd(node, out, indent, blank) {
+    const addBlank = blank !== false;
+    const push = (t) => { out.push(t); if (addBlank) out.push(''); };
+    if (node.nodeType === 3) {
+      const t = node.textContent.replace(/\u00a0/g, ' ');
+      if (t.trim()) push(t);
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tag)) {
+      const txt = inlineToMd(node).replace(/\n+/g, ' ').trim();
+      push('#'.repeat(+tag[1]) + ' ' + txt);
+      return;
+    }
+    if (tag === 'ul' || tag === 'ol') {
+      listToMd(node, out, indent, tag === 'ol');
+      if (addBlank) out.push('');
+      return;
+    }
+    if (tag === 'blockquote') {
+      const inner = [];
+      // 子块之间保留空行，否则重新渲染时会被并成一段
+      Array.from(node.childNodes).forEach(c => blockToMd(c, inner, indent, true));
+      // 合并连续空行、去掉首尾空行，避免写出 "> " 之类的空引用行
+      const lines = [];
+      inner.join('\n').split('\n').forEach(l => {
+        if (!l.trim() && (!lines.length || !lines[lines.length - 1].trim())) return;
+        lines.push(l);
+      });
+      while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+      if (lines.length) lines.forEach(l => out.push(l.trim() ? '> ' + l : '>'));
+      else out.push('>');
+      if (addBlank) out.push('');
+      return;
+    }
+    if (tag === 'pre') {
+      const code = node.querySelector('code');
+      const m = code && /lang-(\S+)/.exec(code.className || '');
+      const body = (code ? code.innerText : node.innerText).replace(/\n$/, '');
+      push('```' + (m ? m[1] : '') + '\n' + body + '\n```');
+      return;
+    }
+    if (tag === 'hr') { push('---'); return; }
+    if (tag === 'table') { tableToMd(node, out); if (addBlank) out.push(''); return; }
+    if (tag === 'br') return;
+    if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
+      if (hasBlockChild(node)) {
+        Array.from(node.childNodes).forEach(c => blockToMd(c, out, indent, addBlank));
+        return;
+      }
+      const body = inlineToMd(node).replace(/\u00a0/g, ' ');
+      // 空段落（只有一个 <br>）：只补一行空行，不加块间距，
+      // 这样「块间距 1 行 + 空段落 1 行 = 2 行空行」，renderMd 才好把它还原成空行
+      if (!body.replace(/[\s\u200b]/g, '') && !node.querySelector('img,table,hr')) {
+        out.push('');
+        return;
+      }
+      push(body);
+      return;
+    }
+    const txt = inlineToMd(node);
+    if (txt.trim()) push(txt);
+  }
+  function htmlToMd(root) {
+    if (!root) return '';
+    const out = [];
+    Array.from(root.childNodes).forEach(n => blockToMd(n, out, 0, true));
+    // 不再把 3 个以上换行压成 2 个：多出来的空行就是用户特意留的空段落
+    return out.join('\n').replace(/^\n+|\s+$/g, '');
+  }
+
+  /* ---------------- 粘贴：外部 HTML → 本编辑器结构 ----------------
+     别的编辑器（Word / 飞书 / 语雀 / 网页…）复制过来时，text/plain 只剩一行行文字，
+     粗体、缩进层级、列表嵌套全丢。这里改读 text/html，按白名单重建结构后插入。 */
+  const PST_DROP = new Set(['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE', 'NOSCRIPT', 'IFRAME', 'OBJECT',
+    'EMBED', 'SVG', 'CANVAS', 'FORM', 'INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'AUDIO', 'VIDEO',
+    'COLGROUP', 'COL', 'FIGCAPTION']);
+  const PST_BLOCK = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE',
+    'FIGURE', 'ADDRESS', 'DL', 'DT', 'DD', 'CENTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+    'BLOCKQUOTE', 'PRE', 'UL', 'OL', 'LI', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD', 'HR']);
+
+  function pstText(s) {
+    return String(s || '').replace(/\u00a0/g, ' ').replace(/[\u200b-\u200d\ufeff]/g, '');
+  }
+  function pstColor(v) {
+    const s = String(v || '').trim();
+    if (!s) return '';
+    if (/^#[0-9a-f]{3,8}$/i.test(s)) return s.toLowerCase();
+    const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (!m) return '';
+    const h = n => (+n).toString(16).padStart(2, '0');
+    return '#' + h(m[1]) + h(m[2]) + h(m[3]);
+  }
+  function pstStyle(n) {
+    const st = n.style || {};
+    const g = k => String(st[k] || '').toLowerCase();
+    const fw = g('fontWeight');
+    const bg = pstColor(st.backgroundColor);
+    return {
+      bold: fw === 'bold' || fw === 'bolder' || (parseInt(fw, 10) >= 600),
+      plainWeight: fw === 'normal' || fw === '400',
+      italic: /^(italic|oblique)/.test(g('fontStyle')),
+      plainStyle: g('fontStyle') === 'normal',
+      color: pstColor(st.color) || pstColor(n.getAttribute('color')),
+      mark: !!bg && bg !== '#000000' && bg !== '#ffffff',
+    };
+  }
+  function pstWrap(tag, src, dest) {
+    const el = document.createElement(tag);
+    pstInline(src, el);
+    if (el.textContent.trim() || el.querySelector('img,br')) dest.appendChild(el);
+  }
+  // 单个节点当成“行内片段”处理（不能直接把元素当容器，否则会丢掉它自己的粗体/颜色）
+  function pstInlineNode(node, dest) {
+    const frag = document.createDocumentFragment();
+    frag.appendChild(node);
+    pstInline(frag, dest);
+  }
+  // 行内内容：直接写进 dest
+  function pstInline(src, dest) {
+    Array.from(src.childNodes).forEach(n => {
+      if (n.nodeType === 3) {
+        const t = pstText(n.nodeValue).replace(/\s+/g, ' ');
+        if (!t) return;
+        if (!t.trim() && (!dest.lastChild || dest.lastChild.nodeName === 'BR')) return;  // 去掉首尾空白
+        dest.appendChild(document.createTextNode(t));
+        return;
+      }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toUpperCase();
+      if (PST_DROP.has(tag)) return;
+      if (tag === 'BR') { dest.appendChild(document.createElement('br')); return; }
+      const s = pstStyle(n);
+      if (/^(B|STRONG)$/.test(tag)) return s.plainWeight ? pstInline(n, dest) : pstWrap('strong', n, dest);
+      if (/^(I|EM|CITE|VAR|DFN)$/.test(tag)) return s.plainStyle ? pstInline(n, dest) : pstWrap('em', n, dest);
+      if (/^(S|STRIKE|DEL)$/.test(tag)) return pstWrap('del', n, dest);
+      if (/^(CODE|KBD|SAMP|TT)$/.test(tag)) return pstWrap('code', n, dest);
+      if (tag === 'MARK' || s.mark) return pstWrap('mark', n, dest);
+      if (tag === 'IMG') {
+        const src2 = n.getAttribute('src') || '';
+        if (/^(https?:|\.{0,2}\/)/i.test(src2)) {
+          const img = document.createElement('img');
+          img.setAttribute('src', src2);
+          img.setAttribute('alt', n.getAttribute('alt') || '');
+          dest.appendChild(img);
+        }
+        return;
+      }
+      if (tag === 'A' && n.dataset.wiki) {
+        const a = document.createElement('a');
+        a.className = 'wiki';
+        a.dataset.wiki = n.dataset.wiki;
+        a.setAttribute('href', '#');
+        a.textContent = n.dataset.wiki;
+        dest.appendChild(a);
+        return;
+      }
+      if (tag === 'SPAN' && n.dataset.tag) {   // 从本应用内复制的标签，保持成标签
+        const sp = document.createElement('span');
+        sp.className = 'tag-chip';
+        sp.dataset.tag = n.dataset.tag;
+        sp.textContent = '#' + n.dataset.tag;
+        dest.appendChild(sp);
+        return;
+      }
+      if (tag === 'A') {
+        const href = n.getAttribute('href') || '';
+        if (/^(https?:|mailto:)/i.test(href)) {
+          const a = document.createElement('a');
+          a.setAttribute('href', href);
+          pstInline(n, a);
+          if (a.childNodes.length) dest.appendChild(a);
+          return;
+        }
+        return pstInline(n, dest);
+      }
+      if (s.color) {
+        const sp = document.createElement('span');
+        sp.style.color = s.color;
+        pstInline(n, sp);
+        if (sp.childNodes.length) dest.appendChild(sp);
+        return;
+      }
+      if (s.bold) return pstWrap('strong', n, dest);
+      if (s.italic) return pstWrap('em', n, dest);
+      if (PST_BLOCK.has(tag)) {   // 行内位置遇到块：当软换行处理
+        dest.appendChild(document.createElement('br'));
+        pstInline(n, dest);
+        return;
+      }
+      pstInline(n, dest);         // span / font / u / 未知标签：只留内容
+    });
+  }
+  // li 的内容：段落合并成一行（用 <br> 分隔），嵌套列表挂在 li 里
+  function pstLiContent(src, dest) {
+    Array.from(src.childNodes).forEach(n => {
+      if (n.nodeType === 3) {
+        const t = pstText(n.nodeValue).replace(/\s+/g, ' ');
+        if (!t.trim() && !dest.lastChild) return;
+        if (t) dest.appendChild(document.createTextNode(t));
+        return;
+      }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toUpperCase();
+      if (PST_DROP.has(tag)) return;
+      if (tag === 'UL' || tag === 'OL') { pstList(n, dest); return; }
+      if (tag === 'TABLE') { pstTable(n, dest); return; }
+      if (PST_BLOCK.has(tag)) {
+        if (hasBlockChild(n) && !/^(P|DIV|SECTION)$/.test(tag)) { pstBlocks(n, dest); return; }
+        if (dest.textContent.trim() && !dest.lastChild) dest.appendChild(document.createElement('br'));
+        pstInlineNode(n, dest);
+        return;
+      }
+      pstInlineNode(n, dest);
+    });
+  }
+  function pstList(srcList, dest) {
+    const ordered = srcList.tagName.toUpperCase() === 'OL';
+    const list = document.createElement(ordered ? 'ol' : 'ul');
+    const start = parseInt(srcList.getAttribute('start'), 10);
+    if (ordered && start > 1) list.setAttribute('start', String(start));
+    Array.from(srcList.children).forEach(li => {
+      if (li.tagName.toUpperCase() !== 'LI') {
+        const holder = document.createElement('li');
+        pstLiContent(li, holder);
+        if (holder.textContent.trim() || holder.querySelector('img')) list.appendChild(holder);
+        return;
+      }
+      const out = document.createElement('li');
+      pstLiContent(li, out);
+      const hasOwn = out.textContent.trim() || out.querySelector('img');
+      if (hasOwn) { list.appendChild(out); return; }
+      // 只有子列表、没有自己的文字：把子列表挂到上一项，避免出现空圆点
+      const subs = Array.from(out.children).filter(c => /^(UL|OL)$/i.test(c.tagName));
+      const prev = list.lastElementChild;
+      if (prev) subs.forEach(s => prev.appendChild(s));
+      else subs.forEach(s => dest.appendChild(s));
+    });
+    if (list.children.length) dest.appendChild(list);
+  }
+  function pstTable(srcTable, dest) {
+    const trs = Array.from(srcTable.querySelectorAll('tr'))
+      .filter(tr => Array.from(tr.children).some(c => /^(TD|TH)$/i.test(c.tagName)));
+    if (!trs.length) return;
+    const rows = trs.map(tr => Array.from(tr.children)
+      .filter(c => /^(TD|TH)$/i.test(c.tagName))
+      .map(c => {
+        const holder = document.createElement('div');
+        pstInline(c, holder);
+        return Array.from(holder.childNodes).map(x => x.nodeType === 1 && x.tagName === 'BR' ? ' ' : (x.textContent || '')).join('')
+          .replace(/\s+/g, ' ').trim();
+      }));
+    const cols = Math.max(...rows.map(r => r.length));
+    const t = document.createElement('table');
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+    for (let c = 0; c < cols; c++) {
+      const th = document.createElement('th');
+      th.textContent = rows[0][c] || '';
+      htr.appendChild(th);
+    }
+    thead.appendChild(htr);
+    t.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.slice(1).forEach(r => {
+      const tr = document.createElement('tr');
+      for (let c = 0; c < cols; c++) {
+        const td = document.createElement('td');
+        td.textContent = r[c] || '';
+        if (!td.textContent) td.innerHTML = '<br>';
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    });
+    t.appendChild(tbody);
+    dest.appendChild(t);
+  }
+  // 块级内容
+  function pstBlocks(src, dest) {
+    Array.from(src.childNodes).forEach(n => {
+      if (n.nodeType === 3) {
+        const t = pstText(n.nodeValue).replace(/\s+/g, ' ').trim();
+        if (!t) return;
+        const p = document.createElement('p');
+        p.textContent = t;
+        dest.appendChild(p);
+        return;
+      }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toUpperCase();
+      if (PST_DROP.has(tag)) return;
+      if (tag === 'UL' || tag === 'OL') { pstList(n, dest); return; }
+      if (tag === 'LI') { const ul = document.createElement('ul'); ul.appendChild(n.cloneNode(true)); pstList(ul, dest); return; }
+      if (tag === 'TABLE') { pstTable(n, dest); return; }
+      if (tag === 'HR') { dest.appendChild(document.createElement('hr')); return; }
+      if (tag === 'PRE') {
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = n.textContent.replace(/\n+$/, '');
+        pre.appendChild(code);
+        dest.appendChild(pre);
+        return;
+      }
+      if (tag === 'BLOCKQUOTE') {
+        const bq = document.createElement('blockquote');
+        pstBlocks(n, bq);
+        if (!bq.childNodes.length) bq.innerHTML = '<p><br></p>';
+        dest.appendChild(bq);
+        return;
+      }
+      if (/^H[1-6]$/.test(tag)) {
+        const h = document.createElement(tag.toLowerCase());
+        pstInline(n, h);
+        if (h.textContent.trim() || h.querySelector('img')) dest.appendChild(h);
+        return;
+      }
+      if (!PST_BLOCK.has(tag)) {          // 顶层行内元素 → 单独一段
+        const p = document.createElement('p');
+        pstInlineNode(n, p);
+        if (p.textContent.trim() || p.querySelector('img')) dest.appendChild(p);
+        return;
+      }
+      if (hasBlockChild(n)) { pstBlocks(n, dest); return; }   // 纯容器：拆开
+      const p = document.createElement('p');
+      pstInlineNode(n, p);
+      if (p.textContent.trim() || p.querySelector('img')) dest.appendChild(p);
+    });
+  }
+  function pasteHtmlToNodes(html) {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const holder = document.createElement('div');
+    pstBlocks(doc.body, holder);
+    return holder;
+  }
+
+  function countWords(text) {
+    const t = String(text || '').replace(/```[\s\S]*?```/g, '')
+      .replace(/<\/?(?:span|mark)\b[^>]*>/gi, '')
+      .replace(/[#>*`~\-|[\]()!]/g, '');
+    const cjk = (t.match(/[\u3400-\u4DBF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/g) || []).length;
+    const latin = (t.replace(/[\u3400-\u4DBF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/g, ' ').match(/[A-Za-z0-9]+/g) || []).length;
+    return cjk + latin;
+  }
+
+  function extractTags(text) {
+    // 去掉代码块与行内 HTML（字体颜色/高亮），避免把 #d64545 这类色值当成标签
+    const t = String(text || '')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/<\/?(?:span|mark)\b[^>]*>/gi, '');
+    const tags = new Set();
+    const re = /(^|[\s(（])#([^\s#，。,;；!！?？'"）)]{1,40})/g;
+    let m;
+    while ((m = re.exec(t))) tags.add(m[2]);
+    return Array.from(tags);
+  }
+
+  function extractWikiLinks(text) {
+    const t = String(text || '').replace(/```[\s\S]*?```/g, '');
+    const out = new Set();
+    const re = /\[\[([^\]]+)\]\]/g;
+    let m;
+    while ((m = re.exec(t))) out.add(m[1].trim());
+    return Array.from(out);
+  }
+
+  /* ---------------- 存储层（IndexedDB → localStorage → 内存） ---------------- */
+  const Store = {
+    mode: 'indexeddb',      // indexeddb | localstorage | memory
+    db: null,
+    mem: new Map(),
+    LS_KEY: 'orca-notes-data',
+
+    async init() {
+      try {
+        if (!('indexedDB' in window)) throw new Error('no indexedDB');
+        this.db = await new Promise((res, rej) => {
+          const req = indexedDB.open('orca-notes', 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('notes')) {
+              const s = db.createObjectStore('notes', { keyPath: 'id' });
+              s.createIndex('name', 'name', { unique: true });
+            }
+            if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+          };
+          req.onsuccess = () => res(req.result);
+          req.onerror = () => rej(req.error || new Error('open failed'));
+          setTimeout(() => rej(new Error('open timeout')), 3000);
+        });
+        this.mode = 'indexeddb';
+      } catch (e) {
+        // 降级到 localStorage
+        try {
+          localStorage.setItem('__t', '1');
+          localStorage.removeItem('__t');
+          this.mode = 'localstorage';
+        } catch (e2) {
+          this.mode = 'memory';
+        }
+      }
+      // 兼容旧数据：曾绑定过本地文件夹的用户，把残留的 handle 清掉
+      try { await this.setSetting('folderHandle', null); } catch {}
+      return this.mode;
+    },
+
+    _lsRead() {
+      try { return JSON.parse(localStorage.getItem(this.LS_KEY) || '{"notes":{},"settings":{}}'); }
+      catch { return { notes: {}, settings: {} }; }
+    },
+    _lsWrite(data) {
+      try { localStorage.setItem(this.LS_KEY, JSON.stringify(data)); } catch {}
+    },
+
+    async allNotes() {
+      if (this.mode === 'indexeddb') {
+        try {
+          return await new Promise((res, rej) => {
+            const r = this.db.transaction('notes', 'readonly').objectStore('notes').getAll();
+            r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+          });
+        } catch { /* 落回下方 */ }
+      }
+      if (this.mode === 'localstorage') return Object.values(this._lsRead().notes);
+      return Array.from(this.mem.values());
+    },
+
+    async byName(name) {
+      const all = await this.allNotes();
+      return all.find(n => n.name === name) || null;
+    },
+
+    async put(note) {
+      const now = Date.now();
+      let target = note;
+      if (!note.id) {
+        const exist = await this.byName(note.name);
+        target = Object.assign({}, exist || {}, note, { id: exist ? exist.id : note.name });
+      }
+      target.updatedAt = now;
+
+      if (this.mode === 'indexeddb') {
+        try {
+          await new Promise((res, rej) => {
+            const r = this.db.transaction('notes', 'readwrite').objectStore('notes').put(target);
+            r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+          });
+          return target;
+        } catch { /* 落回 */ }
+      }
+      if (this.mode === 'localstorage') {
+        const d = this._lsRead(); d.notes[target.id] = target; this._lsWrite(d); return target;
+      }
+      this.mem.set(target.id, target);
+      return target;
+    },
+
+    async del(id) {
+      if (this.mode === 'indexeddb') {
+        try {
+          await new Promise((res, rej) => {
+            const r = this.db.transaction('notes', 'readwrite').objectStore('notes').delete(id);
+            r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+          });
+          return;
+        } catch {}
+      }
+      if (this.mode === 'localstorage') {
+        const d = this._lsRead(); delete d.notes[id]; this._lsWrite(d); return;
+      }
+      this.mem.delete(id);
+    },
+
+    async clear() {
+      if (this.mode === 'indexeddb') {
+        try {
+          await new Promise((res, rej) => {
+            const r = this.db.transaction('notes', 'readwrite').objectStore('notes').clear();
+            r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+          });
+          return;
+        } catch {}
+      }
+      if (this.mode === 'localstorage') { const d = this._lsRead(); d.notes = {}; this._lsWrite(d); return; }
+      this.mem.clear();
+    },
+
+    async getSetting(key, fb) {
+      if (this.mode === 'indexeddb' || this.db) {
+        try {
+          const rec = await new Promise((res, rej) => {
+            const r = this.db.transaction('settings', 'readonly').objectStore('settings').get(key);
+            r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+          });
+          return rec ? rec.value : fb;
+        } catch {}
+      }
+      if (this.mode === 'localstorage') {
+        const d = this._lsRead(); return key in d.settings ? d.settings[key] : fb;
+      }
+      return fb;
+    },
+
+    async setSetting(key, value) {
+      if (this.mode === 'indexeddb' || this.db) {
+        try {
+          await new Promise((res, rej) => {
+            const r = this.db.transaction('settings', 'readwrite').objectStore('settings').put({ key, value });
+            r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+          });
+          return;
+        } catch {}
+      }
+      if (this.mode === 'localstorage') {
+        const d = this._lsRead(); d.settings[key] = value; this._lsWrite(d);
+      }
+    },
+  };
+
+  /* ---------------- 状态 ---------------- */
+  const S = {
+    notes: [],
+    // current / dirty 是「活动窗格」的快捷视图，见下面的 defineProperty
+    view: 'edit',                 // edit | preview
+    split: false,                 // 源码对照（左编辑 / 右 Markdown 源码）
+    daySplit: false,              // 双栏：左右各一天，可同时编辑
+    tags: [],
+    dav: { url: '', user: '', pass: '', auto: false },
+    firstMonday: true,
+    search: '',
+    tab: 'notes',                 // notes=全部 | fav=收藏
+    tagFilter: '',                // 侧栏标签筛选
+    bpOpen: false,                // 底部引用面板展开状态
+    calView: new Date(),
+    calSel: new Date(),
+    noteDates: new Set(),
+  };
+
+  /* ---------------- 窗格（单栏 A / 双栏 A+B） ---------------- */
+  // 每个窗格有自己的笔记、编辑器、撤回栈、自动保存定时器；
+  // 所有“当前”操作落到 ACTIVE 窗格上，另一个窗格只负责显示与自存。
+  const PANES = {};
+  let ACTIVE = 'a';
+  const curPane = () => PANES[ACTIVE] || PANES.a;
+  const otherPane = (p) => (p && p.key === 'a' ? PANES.b : PANES.a);
+  const ED = (p) => (p || curPane()).el.editor;
+
+  Object.defineProperty(S, 'current', {
+    get: () => curPane().note,
+    set: (v) => { curPane().note = v; },
+    configurable: true,
+  });
+  Object.defineProperty(S, 'dirty', {
+    get: () => curPane().dirty,
+    set: (v) => { curPane().dirty = v; },
+    configurable: true,
+  });
+
+  function paneOfNote(note) {
+    if (!note) return null;
+    for (let i = 0; i < 2; i++) {
+      const p = PANES[i === 0 ? 'a' : 'b'];
+      if (p && p.note && p.note.id === note.id) return p;
+    }
+    return null;
+  }
+  function paintActivePane() {
+    ['a', 'b'].forEach(k => {
+      const p = PANES[k];
+      if (!p) return;
+      p.root.classList.toggle('dim', k !== ACTIVE);
+      p.root.classList.toggle('active', k === ACTIVE);
+    });
+  }
+  // 切窗格：状态栏、侧栏高亮、引用面板、日历都跟着走
+  function setActive(key) {
+    if (!PANES[key] || ACTIVE === key) return;
+    ACTIVE = key;
+    paintActivePane();
+    const p = curPane();
+    renderNotes();
+    renderBottomPanel();
+    if (p.note) {
+      setSaveState(p.dirty ? '未保存…'
+        : (p.note.draft ? '未创建（输入内容后自动保存）' : '未修改'), p);
+    }
+    const jd = currentJournalDate(p);
+    if (jd) {
+      fitDatedTitle(jd, p);
+      if (dayKey(jd) !== dayKey(S.calSel)) {
+        S.calSel = new Date(jd.getFullYear(), jd.getMonth(), jd.getDate());
+        S.calView = new Date(jd.getFullYear(), jd.getMonth(), 1);
+        renderCalendar();
+      }
+    }
+    updateTableBar();
+  }
+
+  // 撤回 / 重做：每个窗格一套快照栈
+  function makeUndo(p) {
+    return {
+      stack: [], idx: -1, lock: false, timer: null, LIMIT: 120,
+      reset(md) {
+        this.stack = [{ md: md === undefined ? getMd(p) : md, caret: 0 }];
+        this.idx = 0;
+        this.lock = false;
+        this.update();
+      },
+      snap() {
+        if (this.lock || !p.note) return;
+        const md = getMd(p);
+        const top = this.stack[this.idx];
+        if (top && top.md === md) return;
+        if (this.idx !== this.stack.length - 1) this.stack = this.stack.slice(0, this.idx + 1);
+        this.stack.push({ md: md, caret: caretOffset(p) });
+        if (this.stack.length > this.LIMIT) this.stack.shift();
+        this.idx = this.stack.length - 1;
+        this.update();
+      },
+      schedule() { clearTimeout(this.timer); this.timer = setTimeout(() => this.snap(), 420); },
+      apply(entry) {
+        if (!entry) return;
+        this.lock = true;
+        setMd(entry.md, p);
+        markDirty(p);
+        p.el.editor.focus();
+        setCaretByOffset(entry.caret || 0, p);
+        this.update();
+        setTimeout(() => { this.lock = false; }, 60);
+      },
+      undo() {
+        if (this.idx <= 0) return false;
+        this.idx--; this.apply(this.stack[this.idx]);
+        status('已撤回');
+        return true;
+      },
+      redo() {
+        if (this.idx >= this.stack.length - 1) return false;
+        this.idx++; this.apply(this.stack[this.idx]);
+        status('已重做');
+        return true;
+      },
+      update() {
+        const u = p.el.undo, r = p.el.redo;
+        if (u) u.disabled = this.idx <= 0;
+        if (r) r.disabled = this.idx >= this.stack.length - 1;
+      },
+    };
+  }
+
+  // 右栏由左栏克隆出来（结构 / 样式与左栏完全一致），id 统一加 “-b” 后缀
+  function buildPane(key) {
+    const sfx = key === 'a' ? '' : '-' + key;
+    let root = key === 'a' ? $('pane-a') : null;
+    if (key !== 'a') {
+      const clone = $('pane-a').cloneNode(true);
+      clone.querySelectorAll('[id]').forEach(el => { el.id = el.id + sfx; });
+      clone.id = 'pane-' + key;
+      clone.classList.remove('active', 'dim');
+      clone.classList.add('hidden');
+      const c = (id) => clone.querySelector('#' + id + sfx);
+      c('doc-title').value = '';
+      c('doc-title').style.width = '';
+      c('dt-chips').innerHTML = '';
+      c('tag-suggest').innerHTML = '';
+      c('tag-suggest').classList.add('hidden');
+      c('tb-palette').innerHTML = '';
+      c('tb-palette').classList.add('hidden');
+      c('wc-badge').textContent = '0';
+      c('src-view').value = '';
+      c('editor').innerHTML = '<p><br></p>';
+      c('editor').classList.remove('is-empty');
+      c('preview-pane').classList.add('hidden');
+      c('editor-pane').classList.remove('hidden');
+      c('editor-wrap').classList.remove('split');
+      c('btn-prev-day').classList.add('hidden');
+      c('btn-next-day').classList.add('hidden');
+      $('panes').appendChild(clone);
+      root = clone;
+    }
+    const q = (id) => document.getElementById(id + sfx);
+    const p = {
+      key: key, sfx: sfx, root: root,
+      note: null, dirty: false, _t: null,
+      el: {
+        editor: q('editor'), title: q('doc-title'), chips: q('dt-chips'),
+        tagInput: q('dt-input'), tagSuggest: q('tag-suggest'),
+        wrap: q('editor-wrap'), editPane: q('editor-pane'), preview: q('preview-pane'),
+        toolbar: q('toolbar'), undo: q('btn-undo'), redo: q('btn-redo'),
+        palette: q('tb-palette'), wc: q('wc-badge'), src: q('src-view'),
+        prevDay: q('btn-prev-day'), nextDay: q('btn-next-day'),
+      },
+    };
+    p.undo = makeUndo(p);
+    bindPane(p);
+    return p;
+  }
+
+  function initPanes() {
+    PANES.a = buildPane('a');
+    paintActivePane();
+  }
+
+  // 双栏开关：打开时右栏显示“当前日期的后一天”，两栏都能写
+  async function setDaySplit(on) {
+    if (!!on === !!S.daySplit) return;
+    if (on) {
+      await saveCurrent(false, curPane());
+      S.split = false;                      // 双栏下不再叠加源码对照，否则每列太窄
+      S.daySplit = true;
+      PANES.b = buildPane('b');
+      $('panes').classList.add('splitting');
+      PANES.b.root.classList.remove('hidden');
+      PANES.b.root.classList.add('dim');
+      const base = currentJournalDate(PANES.a);
+      // 左栏是日记 → 右栏接着显示次日；左栏是普通笔记 → 右栏显示今天
+      const next = base
+        ? new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1, 12)
+        : new Date();
+      await openJournal(next, PANES.b);
+      const from = base || next;
+      status('双栏：' + (from.getMonth() + 1) + '月' + from.getDate() + '日 / ' +
+        (next.getMonth() + 1) + '月' + next.getDate() + '日');
+    } else {
+      const wasB = ACTIVE === 'b';
+      const b = PANES.b;
+      if (b) {
+        clearTimeout(b._t);
+        if (b.dirty) await saveCurrent(false, b);
+        b.dead = true;
+      }
+      S.daySplit = false;
+      $('panes').classList.remove('splitting');
+      if (b) b.root.remove();
+      delete PANES.b;
+      ACTIVE = 'a';
+      // 焦点在右栏时，把右栏正在看的笔记挪到左栏，别让眼前内容消失
+      if (wasB && b && b.note) await loadPane(PANES.a, b.note);
+      paintActivePane();
+      status('已退出双栏');
+    }
+    await Store.setSetting('daySplit', S.daySplit);
+    applyView();
+    renderNotes();
+    renderBottomPanel();
+  }
+
+
+  /* ---------------- 日历 ---------------- */
+  function renderCalendar() {
+    const grid = $('cal-grid');
+    const y = S.calView.getFullYear();
+    const m = S.calView.getMonth();
+    $('cal-year').textContent = y;
+    $('cal-month').textContent = m + 1;
+
+    const heads = S.firstMonday
+      ? ['一', '二', '三', '四', '五', '六', '日']
+      : ['日', '一', '二', '三', '四', '五', '六'];
+
+    let html = '<div class="cal-cell head"></div>';
+    heads.forEach(w => { html += '<div class="cal-cell head">周' + w + '</div>'; });
+
+    const first = new Date(y, m, 1);
+    const offset = S.firstMonday ? (first.getDay() + 6) % 7 : first.getDay();
+    const start = new Date(y, m, 1 - offset);
+    const today = new Date();
+    const cur = new Date(start);
+
+    for (let row = 0; row < 6; row++) {
+      html += '<div class="cal-cell weeknum">' + isoWeek(cur) + '</div>';
+      for (let col = 0; col < 7; col++) {
+        const cls = ['cal-cell', 'day'];
+        if (cur.getMonth() !== m) cls.push('other');
+        if (dayKey(cur) === dayKey(today)) cls.push('today');
+        if (dayKey(cur) === dayKey(S.calSel)) cls.push('selected');
+        const has = S.noteDates.has(dayKey(cur));
+        html += '<div class="' + cls.join(' ') + '" data-date="' + dayKey(cur) + '">' +
+          '<span class="num">' + cur.getDate() + '</span>' +
+          (has ? '<span class="dot"></span>' : '') + '</div>';
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.cal-cell.day').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const p = cell.dataset.date.split('-').map(Number);
+        S.calSel = new Date(p[0], p[1] - 1, p[2]);
+        S.calView = new Date(p[0], p[1] - 1, 1);
+        renderCalendar();
+        openJournal(new Date(p[0], p[1] - 1, p[2]));
+      });
+    });
+  }
+
+  /* ---------------- 搜索辅助 ---------------- */
+  // 日记文件名是 2026-10-24，界面上显示 2026年10月24日（只用于显示，不参与搜索）
+  function journalAlias(name) {
+    const d = parseJournalName(name);
+    if (!d) return '';
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+  // Markdown → 可读纯文字（去标记，保留内容），供搜索命中与结果摘要使用
+  function plainText(md) {
+    return String(md || '')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/^```[^\n]*$/gm, ' ')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\[\[([^\]]*)\]\]/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s{0,3}>\s?/gm, '')
+      .replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, '')
+      .replace(/[*_~`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  // 空格分词，全部命中才算（AND）
+  function searchTerms() {
+    return S.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  }
+  // 命中处前后各取一小段作为摘要；起点优先落在标点之后，保证关键词在窄侧栏里也能露出来
+  function snippetOf(text, terms) {
+    if (!text) return '';
+    const low = text.toLowerCase();
+    let at = -1;
+    terms.forEach(t => {
+      const i = low.indexOf(t);
+      if (i >= 0 && (at < 0 || i < at)) at = i;
+    });
+    if (at < 0) return '';
+    let start = Math.max(0, at - 10);
+    if (start > 0) {
+      const win = text.slice(start, at);
+      const p = Math.max.apply(null, [' ', '，', '。', '：', '；', '、', '）', '】', '!', '?']
+        .map(c => win.lastIndexOf(c)));
+      if (p >= 0) start = start + p + 1;
+    }
+    const end = Math.min(text.length, at + 56);
+    const body = text.slice(start, end).trim();
+    return (start > 0 ? '…' : '') + body + (end < text.length ? '…' : '');
+  }
+  // 把命中词包成 <mark>（先分词再逐个转义，避免把标签也替换掉）
+  function hlTerms(text, terms) {
+    if (!terms.length) return esc(text);
+    const pattern = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .sort((a, b) => b.length - a.length).join('|');
+    const re = new RegExp('(' + pattern + ')', 'gi');
+    return String(text).split(re)
+      .map((seg, i) => (i % 2 ? '<mark>' + esc(seg) + '</mark>' : esc(seg))).join('');
+  }
+  // 日记在列表里直接显示中文日期，和顶部标题一致
+  function displayName(n) {
+    const d = parseJournalName(n.name);
+    return d ? journalAlias(n.name) : n.name.replace(/\.md$/i, '');
+  }
+
+  /* ---------------- 侧栏列表 ---------------- */
+  function renderNotes() {
+    const ul = $('note-list');
+    const terms = searchTerms();
+    const searching = terms.length > 0;
+    // 空日记（bug 遗留或清空后的）不参与列表
+    let list = S.notes.filter(n => !isBlankJournal(n));
+
+    // 分段：全部 / 收藏
+    if (S.tab === 'fav') list = list.filter(n => !!n.favorite);
+    // 标签筛选
+    if (S.tagFilter) list = list.filter(n => extractTags(n.content).includes(S.tagFilter));
+
+    // 只搜正文内容：笔记按日期记录，没有标题这一说
+    const hayOf = (n) => plainText(liveContent(n));
+    let hits = new Map();
+    if (searching) {
+      list = list.filter(n => {
+        const body = hayOf(n);
+        if (!terms.every(t => body.toLowerCase().includes(t))) return false;
+        hits.set(n.id, body);
+        return true;
+      });
+    }
+
+    // 筛选条：标签筛选 / 搜索关键词 共用一条
+    const bar = $('filter-bar');
+    if (S.tagFilter) {
+      $('filter-label').textContent = '#' + S.tagFilter;
+      bar.classList.remove('hidden');
+    } else if (searching) {
+      $('filter-label').textContent = '“' + S.search.trim() + '” · ' + list.length + ' 条';
+      bar.classList.remove('hidden');
+    } else {
+      bar.classList.add('hidden');
+    }
+
+    if (!list.length) {
+      let tip = '暂无笔记';
+      if (searching) tip = '没有匹配“' + S.search.trim() + '”的笔记';
+      else if (S.tagFilter) tip = '没有带 #' + S.tagFilter + ' 的笔记';
+      else if (S.tab === 'fav') tip = '还没有收藏。把鼠标移到笔记上，点右侧的 ☆ 即可收藏。';
+      ul.innerHTML = '<li class="empty-tip">' + esc(tip) + '</li>';
+      return;
+    }
+    ul.innerHTML = '';
+    const sorted = list.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    // 另一个窗格正在显示的那篇，用浅底标出来（活动窗格那篇仍是 .active）
+    const op = ACTIVE === 'b' ? PANES.a : PANES.b;
+    const bp = op && op.note && !(S.current && op.note.id === S.current.id) ? op.note.id : null;
+    sorted.slice(0, 300).forEach(n => {
+      const d = parseJournalName(n.name);
+      const li = document.createElement('li');
+      li.className = 'note-item' +
+        (S.current && S.current.id === n.id ? ' active' : (bp && bp === n.id ? ' open' : ''));
+      li.innerHTML =
+        '<span class="n-icon">' + (d ? '📅' : '📄') + '</span>' +
+        '<span class="n-main"><span class="n-name"></span><span class="n-snip"></span></span>' +
+        '<button class="n-fav' + (n.favorite ? ' on' : '') + '" title="' +
+          (n.favorite ? '取消收藏' : '收藏') + '">' + (n.favorite ? '★' : '☆') + '</button>' +
+        '<button class="n-more" title="更多">⋮</button>';
+      li.querySelector('.n-name').textContent = displayName(n);
+      const snip = li.querySelector('.n-snip');
+      if (searching) {
+        const s = snippetOf(hits.get(n.id) || hayOf(n), terms);
+        if (s) snip.innerHTML = hlTerms(s, terms);
+        else snip.remove();
+      } else {
+        snip.remove();
+      }
+      li.addEventListener('click', (e) => {
+        if (e.target.closest('.n-more') || e.target.closest('.n-fav')) return;
+        openNote(n, true);
+      });
+      li.querySelector('.n-fav').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const fav = !n.favorite;
+        await Store.put({ id: n.id, name: liveName(n), content: liveContent(n), favorite: fav });
+        if (S.current && S.current.id === n.id) S.current.favorite = fav;
+        await refreshAll();
+        status(fav ? '已收藏' : '已取消收藏');
+      });
+      li.querySelector('.n-more').addEventListener('click', (e) => {
+        e.stopPropagation();
+        showNoteMenu(e.clientX, e.clientY, n);
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  function filterByTag(tag) {
+    S.tagFilter = tag;
+    S.tab = 'notes';
+    document.querySelectorAll('.seg-item').forEach(b => b.classList.remove('selected'));
+    $('note-list').classList.remove('hidden');
+    $('tag-list').classList.add('hidden');
+    renderNotes();
+  }
+
+  // 标签池：所有笔记里用过的标签（含使用次数），供侧栏列表与「添加标签」建议共用
+  function tagPool() {
+    const map = new Map();
+    S.notes.forEach(n => extractTags(n.content).forEach(t => map.set(t, (map.get(t) || 0) + 1)));
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }));
+  }
+  function renderTags() {
+    const ul = $('tag-list');
+    const tags = tagPool();
+    if (!tags.length) {
+      ul.innerHTML = '<li class="empty-tip">还没有标签。在编辑区标题下方的「＋ 添加标签」，或直接在正文写 #标签。</li>';
+      return;
+    }
+    ul.innerHTML = '';
+    tags.forEach(({ name: t, count: c }) => {
+      const li = document.createElement('li');
+      li.className = 'tag-item';
+      li.innerHTML = '<span>#' + esc(t) + '</span><span class="t-count">' + c + '</span>';
+      li.addEventListener('click', () => {
+        S.search = '';
+        $('search').value = '';
+        filterByTag(t);
+        status('筛选 #' + t + '：' + c + ' 篇');
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  /* ---------------- 当前笔记的标签条 ---------------- */
+  function renderDocTags(p) {
+    p = p || curPane();
+    const box = p.el.chips;
+    if (!box) return;
+    if (!p.note) { box.innerHTML = ''; return; }
+    const tags = extractTags(getMd(p));
+    box.innerHTML = '';
+    tags.forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'dt-chip';
+      chip.dataset.tag = t;
+      chip.innerHTML = '<span>#' + esc(t) + '</span><span class="dt-x" title="从正文移除">✕</span>';
+      chip.querySelector('.dt-x').addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeTag(t, p);
+      });
+      chip.addEventListener('click', () => filterByTag(t));
+      box.appendChild(chip);
+    });
+  }
+
+  function addTag(tag, p) {
+    p = p || curPane();
+    const clean = String(tag || '').trim().replace(/^#+/, '').replace(/\s+/g, '');
+    if (!clean) return;
+    if (extractTags(getMd(p)).includes(clean)) { renderDocTags(p); return; }
+    const el = document.createElement('p');
+    const span = document.createElement('span');
+    span.className = 'tag-chip';
+    span.dataset.tag = clean;
+    span.textContent = '#' + clean;
+    el.appendChild(span);
+    ED(p).appendChild(el);
+    markDirty(p);
+    renderDocTags(p);
+  }
+
+  function removeTag(tag, p) {
+    p = p || curPane();
+    const re = new RegExp('(^|[\\s(（])#' + tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[\\s，。,;；!！?？\'"）)])', 'g');
+    const md = getMd(p).replace(re, (m, p1) => p1)
+      .replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+    setMd(md, p);
+    markDirty(p);
+    renderDocTags(p);
+  }
+
+  /* --- 标签池建议：别的笔记用过的标签会出现在这里，点一下才标记到本篇 --- */
+  let tagSugIdx = -1;
+  let tagSugList = [];
+  let tagSugPane = null;
+  function tagSuggestCandidates(p) {
+    const used = extractTags(getMd(p));
+    const q = p.el.tagInput.value.trim().replace(/^#+/, '').toLowerCase();
+    return tagPool()
+      .filter(x => !used.includes(x.name))
+      .filter(x => !q || x.name.toLowerCase().includes(q));
+  }
+  function showTagSuggest(p) {
+    p = p || curPane();
+    const box = p.el.tagSuggest;
+    if (!box) return;
+    tagSugPane = p;
+    tagSugList = tagSuggestCandidates(p);
+    tagSugIdx = -1;
+    if (!tagSugList.length) {
+      const other = tagPool().filter(x => !extractTags(getMd(p)).includes(x.name));
+      box.innerHTML = '<div class="ts-empty">' + (other.length
+        ? '没有匹配的标签'
+        : '标签池里还没有别的标签。输入新名字回车，它会出现在其它笔记的建议里。') + '</div>';
+      box.classList.remove('hidden');
+      return;
+    }
+    box.innerHTML = '';
+    tagSugList.slice(0, 10).forEach((x, i) => {
+      const b = document.createElement('button');
+      b.className = 'ts-item';
+      b.dataset.i = String(i);
+      b.innerHTML = '<span>#' + esc(x.name) + '</span><span class="ts-count">' + x.count + ' 篇</span>';
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); pickTag(x.name, p); });
+      box.appendChild(b);
+    });
+    box.classList.remove('hidden');
+  }
+  function pickTag(name, p) {
+    p = p || tagSugPane || curPane();
+    addTag(name, p);
+    p.el.tagInput.value = '';
+    hideTagSuggest(p);
+    status('已添加标签 #' + name);
+  }
+  function hideTagSuggest(p) {
+    p = p || curPane();
+    const box = p.el.tagSuggest;
+    if (box) box.classList.add('hidden');
+    tagSugIdx = -1;
+  }
+  function moveTagSug(delta, p) {
+    p = p || curPane();
+    if (!tagSugList.length) return;
+    tagSugIdx = (tagSugIdx + delta + tagSugList.length) % tagSugList.length;
+    const box = p.el.tagSuggest;
+    Array.from(box.querySelectorAll('.ts-item')).forEach((el, i) => el.classList.toggle('on', i === tagSugIdx));
+  }
+
+  /* ---------------- 笔记打开 / 保存 ---------------- */
+  // 正在某个窗格里编辑的笔记以编辑器内容为准，避免收藏/改名时用旧内容覆盖
+  function liveContent(note) {
+    const p = paneOfNote(note);
+    return p ? getMd(p) : (note.content || '');
+  }
+  function liveName(note) {
+    const p = paneOfNote(note);
+    if (!p) return note.name;
+    const jd = parseJournalName(note.name);
+    if (jd) return note.name;
+    const t = p.el.title.value.trim();
+    return t ? (t.endsWith('.md') ? t : t + '.md') : note.name;
+  }
+  function setTitleFor(note, p) {
+    p = p || curPane();
+    const t = p.el.title;
+    const jd = parseJournalName(note.name);
+    if (jd) {
+      t.value = jd.getFullYear() + '年' + (jd.getMonth() + 1) + '月' + jd.getDate() + '日';
+      t.readOnly = true;
+      t.title = '日记文件名固定为日期，不可改名';
+    } else {
+      t.value = note.name.replace(/\.md$/, '');
+      t.readOnly = false;
+      t.title = '';
+    }
+    fitDatedTitle(jd, p);
+  }
+  // 日记标题按文字宽度收窄，好让「›」紧贴日期，又不动左边缘（标题仍与正文左对齐）
+  function measureTextWidth(text, el) {
+    const cs = getComputedStyle(el);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' / 1 ' + cs.fontFamily;
+    return c.measureText(text).width;
+  }
+  function fitDatedTitle(jd, p) {
+    p = p || curPane();
+    const t = p.el.title;
+    const on = !!jd;
+    p.el.prevDay.classList.toggle('hidden', !on);
+    p.el.nextDay.classList.toggle('hidden', !on);
+    t.classList.toggle('dated', on);
+    if (!on) { t.style.width = ''; return; }
+    t.style.width = Math.ceil(measureTextWidth(t.value, t)) + 2 + 'px';
+  }
+  // 窗格对应的日期（非日记返回 null）
+  function currentJournalDate(p) {
+    p = p || curPane();
+    return p.note ? parseJournalName(p.note.name) : null;
+  }
+  async function stepDay(delta, p) {
+    p = p || curPane();
+    const jd = currentJournalDate(p);
+    if (!jd) return;
+    // 用中午避开夏令时/时区边界
+    const d = new Date(jd.getFullYear(), jd.getMonth(), jd.getDate() + delta, 12);
+    if (p === curPane()) {
+      S.calSel = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      S.calView = new Date(d.getFullYear(), d.getMonth(), 1);
+      renderCalendar();
+    }
+    await openJournal(d, p);
+    status((delta < 0 ? '前一天 · ' : '后一天 · ') + (d.getMonth() + 1) + '月' + d.getDate() + '日');
+  }
+
+  async function openJournal(date, p) {
+    p = p || curPane();
+    const name = journalName(date);
+    let note = await Store.byName(name);
+    if (!note) {
+      // 不落盘：只在内存里开一个草稿视图，用户真正写入内容后才创建 .md
+      note = {
+        id: 'draft:' + name,
+        name: name,
+        content: '',
+        favorite: false,
+        draft: true,
+        updatedAt: Date.now(),
+      };
+    }
+    await openNote(note, false, true, p);
+  }
+
+  // 只装载，不做保存 / 去重判断
+  async function loadPane(p, note) {
+    p.note = note;
+    p.dirty = false;
+    setTitleFor(note, p);
+    setMd(note.content || '', p);
+    p.undo.reset(note.content || '');
+    renderPreview(p);
+    updateWc(p);
+    renderDocTags(p);
+    if (p === curPane()) {
+      setSaveState(note.draft ? '未创建（输入内容后自动保存）' : '未修改', p);
+    }
+    renderNotes();
+    renderBottomPanel();
+  }
+
+  async function openNote(note, pushHistory, doSave, p) {
+    p = p || curPane();
+    if (doSave !== false && p.dirty) await saveCurrent(false, p);
+
+    const o = otherPane(p);
+    // 同一篇笔记不同时占两个窗格：撞上了就互换两边内容
+    const swap = (o && o.note && p.note && o.note.id === note.id) ? p.note : null;
+    await loadPane(p, note);
+    if (swap) await loadPane(o, swap);
+
+    // 空白笔记直接进入可写状态，点日历当天就能打字（只对正在操作的窗格抢焦点）
+    if (p === curPane() && !getMd(p).trim() && S.view === 'edit' && !S.split) {
+      const ed = p.el.editor;
+      ed.focus();
+      placeCaretEnd(ed.firstElementChild || ed);
+    }
+    // 窄屏下选完笔记把抽屉收起来，别挡着正文
+    if (p === curPane() && isNarrow()) setSidebar(false);
+  }
+
+  async function saveCurrent(manual, p) {
+    p = p || curPane();
+    if (!p.note || p.dead) return;
+    const content = getMd(p);
+
+    // 空白日记草稿不落盘：不产生文件、不进列表、不打日历圆点
+    if (p.note.draft && !content.trim()) {
+      p.note.content = '';
+      p.dirty = false;
+      if (p === curPane()) setSaveState('未创建（输入内容后自动保存）', p);
+      if (manual) status('空日记未创建文件');
+      return;
+    }
+
+    const title = p.el.title.value.trim() || '无标题';
+    const jd = parseJournalName(p.note.name);
+    const name = jd ? p.note.name
+      : (title.endsWith('.md') ? title : title + '.md');
+
+    const saved = await Store.put({
+      id: p.note.draft ? undefined : p.note.id,
+      name: name,
+      content: content,
+      favorite: p.note.favorite || false,
+    });
+    p.note = saved;
+    p.dirty = false;
+    if (p === curPane()) {
+      setSaveState('已保存 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false }), p);
+    }
+    await refreshAll();
+    renderPreview(p);
+    updateWc(p);
+    if (manual) status('已保存到本地');
+    if (FEATURES.webdav && S.dav.auto && S.dav.url) {
+      davPutOne(saved).catch(e => setSyncStatus('同步失败：' + e.message));
+    }
+  }
+
+  /* ---------------- 撤回 / 重做（每个窗格一套 Markdown 快照栈，见 makeUndo） ---------------- */
+  // 光标在编辑器内的文本偏移量（撤销后用它把光标放回原处）
+  function caretOffset(p) {
+    const r = getRange(p);
+    if (!r) return 0;
+    const pre = document.createRange();
+    pre.selectNodeContents(ED(p));
+    try { pre.setEnd(r.startContainer, r.startOffset); } catch (e) { return 0; }
+    return pre.toString().length;
+  }
+  function setCaretByOffset(off, p) {
+    const ed = ED(p);
+    const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+    let acc = 0, n, last = null;
+    while ((n = walker.nextNode())) {
+      const len = n.textContent.length;
+      if (acc + len >= off) { placeCaret(n, Math.max(0, off - acc)); return; }
+      acc += len; last = n;
+    }
+    if (last) placeCaret(last, last.textContent.length);
+    else placeCaret(ed, 0);
+  }
+  function markDirty(p) {
+    p = p || curPane();
+    p.dirty = true;
+    p.undo.schedule();
+    setSaveState('未保存…', p);
+    updatePlaceholder(p);
+    renderPreview(p);
+    updateWc(p);
+    renderDocTags(p);
+    clearTimeout(p._t);
+    p._t = setTimeout(() => saveCurrent(false, p), 650);
+  }
+
+  function updateWc(p) {
+    p = p || curPane();
+    if (p.el.wc) p.el.wc.textContent = countWords(getMd(p));
+  }
+  // 状态栏只有一条：只显示活动窗格的保存状态
+  function setSaveState(txt, p) {
+    p = p || curPane();
+    if (p !== curPane()) return;
+    const el = $('status-save');
+    el.textContent = txt;
+    el.classList.toggle('dirty', p.dirty);
+    el.classList.toggle('saved', !p.dirty && txt.indexOf('已保存') === 0);
+  }
+  // 源码视图：用户正在源码框里打字时不要回写，避免光标跳动
+  function renderSource(p) {
+    p = p || curPane();
+    const src = p.el.src;
+    if (!src) return;
+    if (document.activeElement === src) return;
+    src.value = getMd(p);
+  }
+  function renderPreview(p) { renderSource(p); }
+  function status(t) { $('status-text').textContent = t; }
+  function setSyncStatus(t) {
+    $('status-sync').textContent = t;
+    clearTimeout(S._st);
+    S._st = setTimeout(() => { $('status-sync').textContent = ''; }, 5000);
+  }
+
+  // 清掉历史版本“点日期即建空文件”留下的空日记（内容为空，无信息损失）
+  async function purgeBlankJournals() {
+    const blanks = (await Store.allNotes()).filter(isBlankJournal);
+    for (const n of blanks) {
+      try { await Store.del(n.id); } catch {}
+    }
+    return blanks.length;
+  }
+
+  async function refreshAll() {
+    S.notes = (await Store.allNotes()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    S.noteDates = new Set(
+      S.notes
+        .filter(n => !isBlankJournal(n))
+        .map(n => parseJournalName(n.name)).filter(Boolean).map(d => dayKey(d))
+    );
+    renderNotes();
+    renderTags();
+    renderCalendar();   // 日历随数据刷新圆点
+    renderBottomPanel(); // 新建 / 删除笔记后引用方随之更新
+  }
+
+  /* ---------------- 底部引用面板：双链引用方 ---------------- */
+  function bpStats() {
+    if (!S.current) return { refs: [], missing: [] };
+    const curName = S.current.name.replace(/\.md$/, '');
+    const jd = parseJournalName(S.current.name);
+    const alias = jd ? jd.getFullYear() + '年' + (jd.getMonth() + 1) + '月' + jd.getDate() + '日' : null;
+    const names = alias ? [curName, alias] : [curName];
+
+    const refs = S.notes.filter(n => {
+      if (n.id === S.current.id) return false;
+      const links = extractWikiLinks(n.content).map(l => l.replace(/\.md$/, ''));
+      if (links.some(l => names.includes(l))) return true;
+      return names.some(nm => new RegExp('\\[([^\\]]*)\\]\\(' + nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.md\\)').test(n.content || ''));
+    });
+
+    const missing = extractWikiLinks(getMd())
+      .filter(l => !S.notes.some(n => n.name === l + '.md' || n.name === l || n.name === l.replace(/\.md$/, '') + '.md'));
+
+    return { refs };
+  }
+
+  function renderBottomPanel() {
+    const body = $('bp-body');
+    if (!S.current) {
+      $('bp-summary').textContent = '无打开笔记';
+      body.innerHTML = '<div class="bp-empty">无打开笔记</div>';
+      return;
+    }
+    const { refs } = bpStats();
+    // 日记提示里用界面上看到的日期写法，用户照着写 [[2026年10月24日]] 也能解析
+    const curName = displayName(S.current);
+    $('bp-summary').textContent = '引用方 ' + refs.length;
+
+    body.innerHTML = '';
+    if (!refs.length) {
+      body.innerHTML = '<div class="bp-empty">还没有其他笔记引用本篇。在别的笔记正文里写 [[' +
+        esc(curName) + ']]，它就会出现在这里（双向链接）。</div>';
+      return;
+    }
+    refs.forEach(n => body.appendChild(bpRow(n)));
+  }
+
+  function bpRow(n) {
+    const div = document.createElement('div');
+    div.className = 'bp-row';
+    const d = parseJournalName(n.name);
+    div.innerHTML = '<span>' + (d ? '📅' : '📄') + '</span><span></span>';
+    div.lastElementChild.textContent = n.name.replace(/\.md$/, '');
+    div.addEventListener('click', () => openNote(n, true));
+    return div;
+  }
+
+  /* ---------------- 笔记菜单 ---------------- */
+  let activeMenu = null;
+  function closeMenu() {
+    if (activeMenu) { activeMenu.remove(); activeMenu = null; }
+  }
+  function showNoteMenu(x, y, note) {
+    closeMenu();
+    const menu = document.createElement('div');
+    menu.className = 'menu';
+    menu.style.left = Math.min(x, window.innerWidth - 150) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - 130) + 'px';
+    const jd = parseJournalName(note.name);
+    menu.innerHTML =
+      '<button data-act="favorite">' + (note.favorite ? '取消收藏' : '收藏') + '</button>' +
+      '<button data-act="rename"' + (jd ? ' disabled style="opacity:.4"' : '') + '>重命名</button>' +
+      '<button data-act="export">导出 .md</button>' +
+      '<button data-act="delete" class="danger">删除</button>';
+    document.body.appendChild(menu);
+    activeMenu = menu;
+    menu.addEventListener('click', async (e) => {
+      const act = e.target.dataset.act;
+      if (!act) return;
+      closeMenu();
+      if (act === 'favorite') {
+        const fav = !note.favorite;
+        await Store.put({
+          id: note.id, name: liveName(note), content: liveContent(note), favorite: fav,
+        });
+        if (S.current && S.current.id === note.id) S.current.favorite = fav;
+        await refreshAll();
+        status(fav ? '已收藏' : '已取消收藏');
+      }
+      if (act === 'export') downloadNote(note);
+      if (act === 'rename') {
+        const name = prompt('新名称（不含 .md）', note.name.replace(/\.md$/, ''));
+        if (!name) return;
+        await Store.put({ id: note.id, name: name + '.md', content: liveContent(note), favorite: note.favorite });
+        await refreshAll();
+        if (S.current && S.current.id === note.id) {
+          const fresh = await Store.byName(name + '.md');
+          if (fresh) await openNote(fresh, false, false);
+        }
+      }
+      if (act === 'delete') {
+        if (!confirm('删除「' + note.name + '」？')) return;
+        await Store.del(note.id);
+        if (S.current && S.current.id === note.id) {
+          S.current = null;
+          await refreshAll();
+          await openJournal(new Date());
+        } else {
+          await refreshAll();
+        }
+      }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (activeMenu && !activeMenu.contains(e.target)) closeMenu();
+  });
+
+  /* ---------------- 视图模式 ---------------- */
+  /* 顶栏图标（16px 线性 SVG，描边用 currentColor，和文字一起变色） */
+  const SVG = (d, extra) => '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">' +
+    d + (extra || '') + '</svg>';
+  const ICON = {
+    eye: SVG('<path d="M1.9 8S4.4 3.9 8 3.9 14.1 8 14.1 8 11.6 12.1 8 12.1 1.9 8 1.9 8Z"/>', '<circle cx="8" cy="8" r="1.75"/>'),
+    pencil: SVG('<path d="M11.1 2.6l2.3 2.3-7.4 7.4-3.1.8.8-3.1 7.4-7.4Z"/><path d="M9.6 4.1l2.3 2.3"/>'),
+    split: SVG('<rect x="2.2" y="3.2" width="11.6" height="9.6" rx="1.2"/><path d="M8 3.2v9.6"/>'),
+  };
+
+  function applyView() {
+    ['a', 'b'].forEach(k => {
+      const p = PANES[k];
+      if (!p) return;
+      // 双栏时不再叠加「源码对照」，否则每一列都太窄
+      const srcSplit = S.split && !S.daySplit;
+      p.el.wrap.classList.toggle('split', srcSplit);
+      if (srcSplit) {
+        p.el.editPane.classList.remove('hidden');
+        p.el.preview.classList.remove('hidden');
+      } else if (S.view === 'preview') {
+        p.el.editPane.classList.add('hidden');
+        p.el.preview.classList.remove('hidden');
+        renderPreview(p);
+      } else {
+        p.el.editPane.classList.remove('hidden');
+        p.el.preview.classList.add('hidden');
+      }
+    });
+    const btn = $('btn-view');
+    if (S.split && !S.daySplit) {
+      btn.innerHTML = ICON.split;
+      btn.title = '分栏对照（再点回到写作）';
+    } else if (S.view === 'preview') {
+      btn.innerHTML = ICON.pencil;
+      btn.title = '回到写作 (Ctrl+E)';
+    } else {
+      btn.innerHTML = ICON.eye;
+      btn.title = '只读预览 (Ctrl+E)';
+    }
+    const db = $('btn-day-split');
+    if (db) {
+      db.classList.toggle('on', S.daySplit);
+      db.title = S.daySplit
+        ? '退出双栏 (Ctrl+Shift+D)'
+        : '双栏：同时编辑连续两天 (Ctrl+Shift+D)';
+    }
+  }
+
+  /* ---------------- 富文本编辑器（所见即所得，落盘仍是 Markdown） ---------------- */
+  function getMd(p) { return htmlToMd(ED(p)); }
+  function updatePlaceholder(p) {
+    p = p || curPane();
+    const el = p.el.editor;
+    const empty = !el.textContent.trim() &&
+      !el.querySelector('img,table,pre,hr,ul,ol,blockquote');
+    el.classList.toggle('is-empty', empty);
+  }
+  function setMd(md, p) {
+    p = p || curPane();
+    const el = p.el.editor;
+    const html = renderMd(md || '');
+    // 始终保证有可编辑的块，避免文字落在编辑器根的裸文本节点里
+    el.innerHTML = html || '<p><br></p>';
+    updatePlaceholder(p);
+    renderSource(p);
+  }
+  function getRange(p) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const r = sel.getRangeAt(0);
+    if (!ED(p).contains(r.startContainer)) return null;
+    return r;
+  }
+  function placeCaret(node, offset) {
+    if (!node) return;
+    const r = document.createRange();
+    try { r.setStart(node, offset || 0); } catch (e) { return; }
+    r.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  function placeCaretEnd(el) {
+    const r = document.createRange();
+    r.selectNodeContents(el); r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  function blockOf() {
+    const r = getRange();
+    if (!r) return null;
+    let node = r.startContainer;
+    if (node.nodeType === 3) node = node.parentNode;
+    while (node && node !== ED()) {
+      if (node.nodeType === 1 && BLOCKS.test(node.tagName)) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  // 光标在编辑器根（裸文本 / 空白区）时，放进最近的块
+  function ensureBlock() {
+    const blk = blockOf();
+    if (blk) return blk;
+    const r = getRange();
+    if (!r) return null;
+    let node = r.startContainer;
+    if (node.nodeType === 3 && node.parentNode === ED()) {
+      const p = document.createElement('p');
+      node.before(p);
+      p.appendChild(node);
+      placeCaret(p.firstChild, Math.min(r.startOffset, p.firstChild.textContent.length));
+      return p;
+    }
+    if (node === ED()) {
+      const kids = Array.from(ED().children);
+      let target = kids[r.startOffset - 1] || kids[r.startOffset] || kids[kids.length - 1];
+      if (!target) {
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        ED().appendChild(p);
+        target = p;
+      }
+      if (/^(UL|OL)$/.test(target.tagName)) target = target.lastElementChild || target;
+      if (/^(BLOCKQUOTE)$/.test(target.tagName)) target = target.lastElementChild || target;
+      placeCaretEnd(target);
+      return blockOf();
+    }
+    return null;
+  }
+
+  // 浏览器插入块内容时可能把 <ul>/<table> 塞进 <p> 里，这里把它们提到段落之后
+  function liftNestedBlocks(root) {
+    if (!root) return;
+    Array.from(root.querySelectorAll('p,h1,h2,h3,h4,h5,h6')).forEach(host => {
+      if (!host.isConnected) return;
+      const extra = Array.from(host.children).filter(c => /^(UL|OL|TABLE|PRE|BLOCKQUOTE|HR)$/.test(c.tagName));
+      if (!extra.length) return;
+      // 用 DocumentFragment 一次性插到段落后面：逐个 host.after() 会让多个块逆序
+      const frag = document.createDocumentFragment();
+      extra.forEach(c => frag.appendChild(c));
+      host.after(frag);         // 同一父容器内提到段落后面，结构就合法了
+    });
+  }
+  // 粘贴后收拾块首/块尾多余的 <br>（空段落里的 <br> 保留）
+  function tidyAfterPaste(root) {
+    if (!root) return;
+    root.querySelectorAll('p,h1,h2,h3,h4,h5,h6').forEach(el => {
+      if (!el.isConnected) return;
+      if (!el.textContent.trim() && !el.querySelector('img,table')) return;
+      while (el.firstChild && el.firstChild.nodeName === 'BR') el.removeChild(el.firstChild);
+      while (el.lastChild && el.lastChild.nodeName === 'BR') el.removeChild(el.lastChild);
+    });
+  }
+
+  /* --- 回车：续列表 / 退列表 / 标题后回正文 / 续引用 --- */
+  // 光标是否已在该块内容末尾（后面没有可见内容）
+  function caretAtBlockEnd(blk) {
+    const r = getRange();
+    if (!r || !r.collapsed) return false;
+    const tail = document.createRange();
+    try {
+      tail.setStart(r.startContainer, r.startOffset);
+      tail.setEnd(blk, blk.childNodes.length);
+    } catch (err) { return false; }
+    let frag;
+    // 先看文字：光标后面还有字就肯定不在末尾（避免长段落每次 clone 整个 DOM）
+    try { if (tail.toString().replace(/[\s\u00a0\u200b]/g, '')) return false; } catch (err) { return false; }
+    try { frag = tail.cloneContents(); } catch (err) { return false; }
+    if (frag.querySelector('img,table,hr')) return false;
+    return true;
+  }
+  function splitBlock(blk, tagName) {
+    let r = getRange();
+    if (!r) return null;
+    // 有选区时先删掉选中内容，再从光标处切分
+    if (!r.collapsed) { r.deleteContents(); r = getRange() || r; }
+    const after = document.createRange();
+    after.setStart(r.startContainer, r.startOffset);
+    after.setEnd(blk, blk.childNodes.length);
+    const frag = after.extractContents();
+    const el = document.createElement(tagName || 'p');
+    el.appendChild(frag);
+    if (!el.textContent && !el.querySelector('img,br,table')) el.innerHTML = '<br>';
+    // 原块被切空时必须补回 <br>：否则它会塌成 0 高度，
+    // 表现为「在空行里按回车没反应」（只是把唯一那个 <br> 往下挪了一格）
+    if (!blk.textContent && !blk.querySelector('img,br,table')) blk.innerHTML = '<br>';
+    blk.after(el);
+    placeCaret(el, 0);
+    if (el.firstChild && el.firstChild.nodeName === 'BR') placeCaret(el, 0);
+    return el;
+  }
+  function splitLi(li) {
+    let r = getRange();
+    if (!r) return;
+    if (!r.collapsed) { r.deleteContents(); r = getRange() || r; }
+    const after = document.createRange();
+    after.setStart(r.startContainer, r.startOffset);
+    after.setEnd(li, li.childNodes.length);
+    const frag = after.extractContents();
+    const nli = document.createElement('li');
+    nli.appendChild(frag);
+    if (!nli.textContent && !nli.querySelector('img,br')) nli.innerHTML = '<br>';
+    li.after(nli);
+    placeCaret(nli, 0);
+  }
+  // 空列表项退出列表：空行必须是 <ol> 的兄弟节点，不能塞进 <ol> 里，
+  // 否则剩下的项会被当成「子列表」（渲染成 (1)(2)），序号也跟着错。
+  function exitList(li) {
+    const list = li.parentNode;
+    // 子级列表不能直接退出：空段落会插进父级 <li> 里（非法结构，内容还会丢），
+    // 先升一级，再按一次才退出列表
+    if (list && list.closest('li')) { outdentLi(li); return; }
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+    const pos = Array.from(list.children).indexOf(li); // 0 基
+    const base = parseInt(list.getAttribute('start'), 10) || 1;
+    const rest = document.createElement(list.tagName);
+    let sib = li.nextElementSibling;
+    while (sib) { const nx = sib.nextElementSibling; rest.appendChild(sib); sib = nx; }
+    li.remove();
+    if (!list.children.length) {
+      list.replaceWith(p);
+    } else {
+      list.after(p);
+      if (rest.children.length) {
+        // 后面的项另起一个列表，序号接着原来的往下排（不被重置成 1）
+        if (rest.tagName === 'OL') {
+          const start = base + pos + 1;
+          rest.setAttribute('start', String(start));
+          // CSS 的 ol1/ol2 计数器不认 start 属性，得直接重置（从 start-1 起，首项自增后正好是 start）
+          rest.setAttribute('style', 'counter-reset:ol' + olDepthOf(list) + ' ' + (start - 1));
+        }
+        p.after(rest);
+      }
+    }
+    placeCaret(p, 0);
+  }
+  // 该列表在 CSS 计数器里对应 olN 中的第几层（有序祖先的个数，含自身）
+  function olDepthOf(el) {
+    let d = 0, n = el;
+    while (n && n !== ED()) {
+      if (n.tagName === 'OL') d++;
+      n = n.parentNode;
+    }
+    return Math.max(1, d);
+  }
+  function handleEnter(e) {
+    let blk = blockOf();
+    if (!blk) blk = ensureBlock();
+    if (!blk) return false;
+    const tag = blk.tagName;
+    if (tag === 'PRE' || tag === 'TABLE') return false;
+    const li = blk.closest('li');
+    if (li) {
+      e.preventDefault();
+      if (!li.textContent.trim() && !li.querySelector('img,table')) exitList(li);
+      else splitLi(li);
+      return true;
+    }
+    if (/^H[1-4]$/.test(tag)) {
+      e.preventDefault();
+      if (!caretAtBlockEnd(blk)) {
+        // 标题中间回车：前半留在标题，后半变成正文段落
+        splitBlock(blk, 'p');
+        return true;
+      }
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      blk.after(p);
+      placeCaret(p, 0);
+      return true;
+    }
+    if (blk.parentNode && blk.parentNode.tagName === 'BLOCKQUOTE') {
+      e.preventDefault();
+      const bq = blk.parentNode;
+      if (!blk.textContent.trim()) {
+        // 空的引用行 → 跳出引用，接着写正文
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        if (bq.children.length === 1) bq.replaceWith(p);
+        else { bq.after(p); blk.remove(); }
+        placeCaret(p, 0);
+      } else if (!caretAtBlockEnd(blk)) {
+        // 引用行中间回车：后半段切到引用内的下一段（不再整段留在原处）
+        splitBlock(blk, 'p');
+      } else {
+        // 引用行末尾回车：引用内新增一行
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        blk.after(p);
+        placeCaret(p, 0);
+      }
+      return true;
+    }
+    if (tag === 'P' || tag === 'DIV') {
+      e.preventDefault();
+      splitBlock(blk, 'p');
+      return true;
+    }
+    return false;
+  }
+
+  /* --- Tab：列表层级 --- */
+  // 把光标放回 li 自身的文本末尾（跳过子列表）
+  function caretInLi(li) {
+    let target = null;
+    Array.from(li.childNodes).forEach(c => {
+      if (c.nodeType === 3 && c.textContent.trim()) target = c;
+      else if (c.nodeType === 1 && !/^(UL|OL)$/.test(c.tagName)) target = c;
+    });
+    if (!target) { placeCaret(li, 0); return; }
+    if (target.nodeType === 3) placeCaret(target, target.textContent.length);
+    else placeCaretEnd(target);
+  }
+  function indentLi(li) {
+    const prev = li.previousElementSibling;
+    if (!prev) return false;
+    let sub = null;
+    Array.from(prev.children).forEach(c => {
+      if (/^(UL|OL)$/.test(c.tagName)) sub = c;
+    });
+    if (!sub) {
+      sub = document.createElement(li.parentNode.tagName.toLowerCase());
+      prev.appendChild(sub);
+    }
+    sub.appendChild(li);
+    caretInLi(li);
+    return true;
+  }
+  function outdentLi(li) {
+    const list = li.parentNode;
+    const parentLi = list.closest('li');
+    if (!parentLi) return false;
+    const rest = document.createElement(list.tagName);
+    while (li.nextElementSibling) rest.appendChild(li.nextElementSibling);
+    parentLi.after(li);
+    if (rest.children.length) li.after(rest);
+    if (!list.children.length) list.remove();
+    caretInLi(li);
+    return true;
+  }
+  function handleTab(e) {
+    const blk = blockOf();
+    if (!blk) return false;
+    const li = blk.closest('li');
+    if (li) {
+      return e.shiftKey ? outdentLi(li) : indentLi(li);
+    }
+    if (e.shiftKey) return false;
+    document.execCommand('insertText', false, '\u00a0\u00a0\u00a0\u00a0');
+    return true;
+  }
+  /* --- 删除键：子级序号回到上一级（等价 Shift+Tab），一级空项退出列表 --- */
+  // 光标是否在列表项自身文字的最前面（跳过子列表）
+  function caretAtLiStart(li) {
+    const r = getRange();
+    if (!r || !r.collapsed) return false;
+    const head = document.createRange();
+    try { head.setStart(li, 0); head.setEnd(r.startContainer, r.startOffset); } catch (err) { return false; }
+    return !head.toString().replace(/[\s\u00a0\u200b]/g, '');
+  }
+  function handleDeleteKey(li, key) {
+    const list = li.parentNode;
+    if (!list || !/^(UL|OL)$/.test(list.tagName)) return false;
+    if (!caretAtLiStart(li)) return false;
+    const nested = !!list.closest('li');
+    const empty = !li.textContent.trim() && !li.querySelector('img,table');
+    // 子级（空项或行首）→ 升回上一级，等价 Shift+Tab
+    if (nested) return outdentLi(li);
+    // 一级列表的空项 → 退出列表变正文
+    if (key === 'Backspace' && empty) { exitList(li); return true; }
+    return false;
+  }
+
+  /* --- Markdown 即时语法：输入 "# " "- " "1. " "> " 自动变格式 --- */
+  function replaceBlock(blk, makeEl, caretTarget) {
+    const el = makeEl();
+    blk.replaceWith(el);
+    placeCaret(caretTarget ? caretTarget(el) : el, 0);
+    return el;
+  }
+  function autoFormat() {
+    const blk = blockOf();
+    if (!blk || blk.tagName === 'PRE') return;
+    // 已经在列表项里就不再触发块级转换，避免嵌套列表结构损坏
+    if (blk.tagName === 'LI') return;
+    const text = blk.textContent;
+    let m;
+    if ((m = /^(#{1,3})\s$/.exec(text))) {
+      replaceBlock(blk, () => {
+        const h = document.createElement('h' + m[1].length);
+        h.innerHTML = '<br>';
+        return h;
+      });
+      return;
+    }
+    if (/^[-*+]\s$/.test(text) || /^\d+[.)]\s$/.test(text)) {
+      const ordered = /^\d/.test(text);
+      replaceBlock(blk, () => {
+        const list = document.createElement(ordered ? 'ol' : 'ul');
+        const li = document.createElement('li');
+        li.innerHTML = '<br>';
+        list.appendChild(li);
+        return list;
+      }, (list) => list.firstChild);
+      return;
+    }
+    if (/^>\s$/.test(text)) {
+      replaceBlock(blk, () => {
+        const bq = document.createElement('blockquote');
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        bq.appendChild(p);
+        return bq;
+      }, (bq) => bq.firstChild);
+      return;
+    }
+    if (/^```$/.test(text)) {
+      replaceBlock(blk, () => {
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = '\n';
+        pre.appendChild(code);
+        return pre;
+      }, (pre) => pre.firstChild);
+      return;
+    }
+    if (/^(---+|\*\*\*+)$/.test(text)) {
+      const hr = document.createElement('hr');
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      blk.replaceWith(hr);
+      hr.after(p);
+      placeCaret(p, 0);
+      return;
+    }
+  }
+
+  /* --- 格式命令 --- */
+  // 把列表项从列表里摘出来变成独立段落，后面的兄弟项保留为新列表
+  function detachFromList(li) {
+    const list = li.parentNode;
+    const p = document.createElement('p');
+    p.innerHTML = li.innerHTML || '<br>';
+    if (li.nextElementSibling) {
+      const rest = document.createElement(list.tagName);
+      while (li.nextElementSibling) rest.appendChild(li.nextElementSibling);
+      list.after(p);
+      p.after(rest);
+    } else {
+      list.after(p);
+    }
+    li.remove();
+    if (!list.children.length) list.remove();
+    return p;
+  }
+  function setBlockTag(tag) {
+    let blk = ensureBlock() || blockOf();
+    if (!blk) return;
+    const li = blk.closest('li');
+    // 在列表里改成标题/正文/引用：先摘出列表，否则会出现 <ul><p> 这种非法结构
+    if (li) blk = detachFromList(li);
+    const hostList = blk.parentNode && /^(UL|OL)$/.test(blk.parentNode.tagName) ? blk.parentNode : null;
+    if (tag === 'blockquote') {
+      if (blk.parentNode && blk.parentNode.tagName === 'BLOCKQUOTE') return;
+      const bq = document.createElement('blockquote');
+      const p = document.createElement('p');
+      p.innerHTML = blk.innerHTML || '<br>';
+      bq.appendChild(p);
+      blk.replaceWith(bq);
+      if (hostList && !hostList.children.length) hostList.remove();
+      placeCaret(p, 0);
+      return;
+    }
+    if (blk.tagName.toLowerCase() === tag) {
+      if (tag === 'p') { placeCaret(blk, 0); return; }  // 已经是正文，不做无意义的替换
+      const p = document.createElement('p');
+      p.innerHTML = blk.innerHTML || '<br>';
+      blk.replaceWith(p);
+      if (hostList && !hostList.children.length) hostList.remove();
+      placeCaret(p, 0);
+      return;
+    }
+    const el = document.createElement(tag);
+    el.innerHTML = blk.innerHTML || '<br>';
+    blk.replaceWith(el);
+    if (hostList && !hostList.children.length) hostList.remove();
+    placeCaret(el, 0);
+  }
+  function toggleList(tag) {
+    let blk = ensureBlock() || blockOf();
+    if (!blk) return;
+    const li = blk.closest('li');
+    if (li) {
+      const list = li.parentNode;
+      if (list.tagName.toLowerCase() === tag) {
+        // 取消列表：该项变段落
+        const p = document.createElement('p');
+        p.innerHTML = li.innerHTML || '<br>';
+        if (list.children.length === 1) list.replaceWith(p);
+        else li.replaceWith(p);
+        placeCaret(p, 0);
+      } else {
+        const nl = document.createElement(tag);
+        Array.from(list.children).forEach(x => nl.appendChild(x));
+        list.replaceWith(nl);
+        placeCaret(nl.firstChild, 0);
+      }
+      return;
+    }
+    let src = blk;
+    if (src.tagName !== 'P' && src.tagName !== 'DIV') {
+      const p = document.createElement('p');
+      p.innerHTML = src.innerHTML || '<br>';
+      src.replaceWith(p);
+      src = p;
+    }
+    const list = document.createElement(tag);
+    const item = document.createElement('li');
+    item.innerHTML = src.innerHTML || '<br>';
+    list.appendChild(item);
+    src.replaceWith(list);
+    placeCaret(item, 0);
+  }
+  function unwrapEl(el) {
+    const parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    el.remove();
+  }
+  /* --- 字体颜色 / 高亮（Markdown 里存成行内 HTML） --- */
+  const TEXT_COLORS = [
+    { n: '红', c: '#d64545' }, { n: '橙', c: '#d9822b' }, { n: '绿', c: '#2f9e63' },
+    { n: '蓝', c: '#0b6bcb' }, { n: '紫', c: '#7b52c9' }, { n: '灰', c: '#77777f' },
+  ];
+  function applyInlineStyle(makeEl) {
+    const r = getRange();
+    if (!r) { status('先点进正文，再选中要设置格式的文字'); return false; }
+    if (r.collapsed) { status('请先选中要设置格式的文字'); return false; }
+    const el = makeEl();
+    el.appendChild(r.extractContents());
+    r.insertNode(el);
+    const nr = document.createRange();
+    nr.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(nr);
+    return true;
+  }
+  function applyColor(hex) {
+    if (!hex) {
+      const r = getRange();
+      if (!r || r.collapsed) { status('请先选中要清除颜色的文字'); return; }
+      let hit = false;
+      Array.from(ED().querySelectorAll('span[data-color]')).forEach(el => {
+        const inside = r.intersectsNode(el);
+        if (inside) { unwrapEl(el); hit = true; }
+      });
+      if (!hit) status('选中的文字没有设置颜色');
+      else { markDirty(); status('已恢复默认字色'); }
+      return;
+    }
+    if (!applyInlineStyle(() => {
+      const s = document.createElement('span');
+      s.dataset.color = hex;
+      s.style.color = hex;
+      return s;
+    })) return;
+    markDirty();
+    hidePalette();
+    status('已设置字体颜色');
+  }
+  function applyMark() {
+    const r0 = getRange();
+    if (r0 && !r0.collapsed) {
+      let host = r0.commonAncestorContainer;
+      if (host.nodeType === 3) host = host.parentNode;
+      const mk = host.closest && host.closest('mark');
+      if (mk && ED().contains(mk)) {
+        unwrapEl(mk); markDirty(); status('已取消高亮');
+        return;
+      }
+    }
+    if (!applyInlineStyle(() => document.createElement('mark'))) return;
+    markDirty();
+    status('已高亮');
+  }
+  function buildPalette(p) {
+    p = p || curPane();
+    const box = p.el.palette;
+    if (!box || box.childNodes.length) return;
+    TEXT_COLORS.forEach(x => {
+      const b = document.createElement('button');
+      b.className = 'tb-swatch';
+      b.dataset.color = x.c;
+      b.title = x.n;
+      b.style.background = x.c;
+      box.appendChild(b);
+    });
+    const none = document.createElement('button');
+    none.className = 'tb-swatch none';
+    none.dataset.color = '';
+    none.title = '默认（清除颜色）';
+    none.textContent = 'A';
+    box.appendChild(none);
+  }
+  function hidePalette(p) {
+    p = p || curPane();
+    if (p.el.palette) p.el.palette.classList.add('hidden');
+  }
+  function togglePalette() {
+    const p = curPane();
+    buildPalette(p);
+    p.el.palette.classList.toggle('hidden');
+  }
+  function wrapInline(tag) {
+    const sel = window.getSelection();
+    const r = getRange();
+    if (!r) return;
+    let host = r.commonAncestorContainer;
+    if (host.nodeType === 3) host = host.parentNode;
+    const existing = host.closest && host.closest(tag);
+    if (existing && ED().contains(existing)) { unwrapEl(existing); return; }
+
+    if (r.collapsed) {
+      const el = document.createElement(tag);
+      el.appendChild(document.createTextNode('\u200b'));
+      r.insertNode(el);
+      placeCaret(el.firstChild, 1);
+      return;
+    }
+    const el = document.createElement(tag);
+    el.appendChild(r.extractContents());
+    r.insertNode(el);
+    const nr = document.createRange();
+    nr.selectNodeContents(el);
+    sel.removeAllRanges(); sel.addRange(nr);
+  }
+  function insertInlineNode(el) {
+    const r = getRange();
+    if (!r) return;
+    if (!r.collapsed) r.deleteContents();
+    r.insertNode(el);
+    placeCaret(el, el.childNodes.length);
+  }
+  function insertLink() {
+    const sel = window.getSelection().toString();
+    const url = prompt('链接地址', 'https://');
+    if (!url) return;
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = sel || url;
+    insertInlineNode(a);
+  }
+  function insertWiki() {
+    const sel = window.getSelection().toString().trim();
+    const name = prompt('要链接到哪篇笔记？（写标题，没有就新建）', sel || '');
+    if (!name) return;
+    const a = document.createElement('a');
+    a.href = '#'; a.className = 'wiki'; a.dataset.wiki = name.trim();
+    a.textContent = name.trim();
+    insertInlineNode(a);
+  }
+  function insertTagNode() {
+    const sel = window.getSelection().toString().trim().replace(/^#+/, '');
+    let name = sel;
+    if (!name) {
+      name = prompt('标签名（正文里直接输入 #标签 也行）', '') || '';
+    }
+    name = name.trim().replace(/^#+/, '').replace(/\s+/g, '');
+    if (!name) return;
+    const r = getRange();
+    if (!r) return;
+    const span = document.createElement('span');
+    span.className = 'tag-chip';
+    span.dataset.tag = name;
+    span.textContent = '#' + name;
+    if (!r.collapsed) r.deleteContents();
+    // 前面需要空白，标签才会被识别
+    const before = r.startContainer.textContent.slice(0, r.startOffset);
+    if (before && !/[\s(（]$/.test(before)) r.insertNode(document.createTextNode(' '));
+    r.insertNode(span);
+    span.after(document.createTextNode(' '));
+    placeCaret(span.nextSibling, 1);
+  }
+  function insertCodeBlock() {
+    const blk = ensureBlock() || blockOf();
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.textContent = '\n';
+    pre.appendChild(code);
+    if (blk && blk.tagName !== 'PRE') {
+      const content = blk.textContent.trim();
+      if (content) code.textContent = content + '\n';
+      blk.replaceWith(pre);
+    } else {
+      ED().appendChild(pre);
+    }
+    placeCaret(code, code.textContent.length - 1);
+  }
+  /* --- 表格：增删行列（光标在表格内时出现浮动工具条） --- */
+  let tblCell = null;
+  function cellOfRange() {
+    const r = getRange();
+    if (!r) return null;
+    let n = r.startContainer;
+    if (n.nodeType === 3) n = n.parentNode;
+    while (n && n !== ED()) {
+      if (n.tagName === 'TD' || n.tagName === 'TH') return n;
+      n = n.parentNode;
+    }
+    return null;
+  }
+  function updateTableBar() {
+    const bar = $('tbl-bar');
+    if (!bar) return;
+    // 拖列宽时别让工具条弹出来挡住
+    if (typeof ColResize !== 'undefined' && ColResize.drag) { bar.classList.add('hidden'); return; }
+    const cell = cellOfRange();
+    if (!cell) { bar.classList.add('hidden'); tblCell = null; return; }
+    tblCell = cell;
+    bar.classList.remove('hidden');
+    const rect = cell.closest('table').getBoundingClientRect();
+    const bw = bar.offsetWidth || 190;
+    const top = rect.top - 32 > 92 ? rect.top - 32 : rect.bottom + 6;
+    bar.style.top = Math.max(6, top) + 'px';
+    bar.style.left = Math.max(8, Math.min(window.innerWidth - bw - 12, rect.right - bw)) + 'px';
+  }
+  function makeEmptyCell(tagName) {
+    const c = document.createElement(tagName || 'td');
+    c.innerHTML = '<br>';
+    return c;
+  }
+  function tableOp(op) {
+    const cell = tblCell || cellOfRange();
+    if (!cell) { status('先把光标放到表格里'); return; }
+    const table = cell.closest('table');
+    const row = cell.parentNode;
+    const colIdx = Array.from(row.children).indexOf(cell);
+    const inHead = row.parentNode.tagName === 'THEAD';
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const maxCols = Math.max(...rows.map(r => r.children.length));
+    if (op === 'row-add') {
+      const tr = document.createElement('tr');
+      for (let i = 0; i < row.children.length; i++) {
+        tr.appendChild(makeEmptyCell(inHead ? 'th' : (row.children[i].tagName || 'td').toLowerCase()));
+      }
+      if (inHead) {
+        const body = table.querySelector('tbody') || table.appendChild(document.createElement('tbody'));
+        if (body.firstChild) body.insertBefore(tr, body.firstChild);
+        else body.appendChild(tr);
+      } else {
+        row.after(tr);
+      }
+      placeCaret(tr.children[Math.min(colIdx, tr.children.length - 1)], 0);
+      status('已插入一行');
+    } else if (op === 'col-add') {
+      rows.forEach(r => {
+        const ref = r.children[colIdx];
+        const nc = makeEmptyCell(ref && ref.tagName === 'TH' ? 'th' : 'td');
+        if (ref) ref.after(nc); else r.appendChild(nc);
+      });
+      ColResize.sync(table, colIdx + 1, 'add');
+      const target = row.children[colIdx + 1];
+      if (target) placeCaret(target, 0);
+      status('已插入一列');
+    } else if (op === 'row-del') {
+      if (inHead) { status('表头行不能删除'); return; }
+      const tbody = table.querySelector('tbody') || table;
+      const bodyRows = Array.from(tbody.querySelectorAll('tr'));
+      if (bodyRows.length <= 1) { status('表格至少保留一行'); return; }
+      const prev = row.previousElementSibling || row.nextElementSibling;
+      row.remove();
+      if (prev) placeCaret(prev.children[Math.min(colIdx, prev.children.length - 1)] || prev, 0);
+      status('已删除该行');
+    } else if (op === 'col-del') {
+      if (maxCols <= 1) { status('表格至少保留一列'); return; }
+      rows.forEach(r => { const c = r.children[colIdx]; if (c) c.remove(); });
+      ColResize.sync(table, colIdx, 'del');
+      const target = row.children[Math.min(colIdx, row.children.length - 1)];
+      if (target) placeCaret(target, 0);
+      status('已删除该列');
+    } else if (op === 'table-del') {
+      // 先压一格快照，删表后可 Ctrl+Z 直接撤回
+      curPane().undo.snap();
+      const prev = table.previousElementSibling;
+      const next = table.nextElementSibling;
+      table.remove();
+      tblCell = null;
+      $('tbl-bar').classList.add('hidden');
+      const ed = ED();
+      let anchor = prev || next;
+      if (anchor && /^(UL|OL)$/.test(anchor.tagName)) anchor = anchor.lastElementChild || anchor;
+      if (anchor && /^(BLOCKQUOTE)$/.test(anchor.tagName)) anchor = anchor.lastElementChild || anchor;
+      if (!anchor || anchor.tagName === 'TABLE') {
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        if (next) next.before(p); else ed.appendChild(p);
+        anchor = p;
+      }
+      placeCaretEnd(anchor);
+      status('已删除表格，Ctrl+Z 可撤回');
+      markDirty();
+      updateTableBar();
+      return;
+    } else {
+      return;
+    }
+    markDirty();
+    updateTableBar();
+  }
+  function insertTable() {
+    const tbl = document.createElement('table');
+    tbl.innerHTML = '<thead><tr><th>列 1</th><th>列 2</th></tr></thead>' +
+      '<tbody><tr><td><br></td><td><br></td></tr><tr><td><br></td><td><br></td></tr></tbody>';
+    const blk = blockOf();
+    if (blk) blk.after(tbl); else ED().appendChild(tbl);
+    const first = tbl.querySelector('th');
+    placeCaret(first, 0);
+  }
+
+  /* --- 表格列宽：拖动列边界调整；宽度按百分比写进 colgroup --- */
+  const ColResize = {
+    MIN: 64,      // 单列最小宽度（px），约可横排两个汉字 + 单元格内边距
+    TOL: 4,       // 边界命中范围（px）
+    drag: null,
+
+    firstRow(table) { return table.querySelector('thead tr') || table.querySelector('tr'); },
+    colCount(table) { const r = this.firstRow(table); return r ? r.children.length : 0; },
+
+    metrics(table) {
+      const row = this.firstRow(table);
+      if (!row) return null;
+      return {
+        widths: Array.from(row.children).map(c => c.getBoundingClientRect().width),
+        total: table.getBoundingClientRect().width,
+      };
+    },
+
+    colgroup(table, create) {
+      let cg = table.querySelector(':scope > colgroup');
+      if (!cg && create) {
+        cg = document.createElement('colgroup');
+        table.insertBefore(cg, table.firstChild);
+      }
+      return cg;
+    },
+
+    // 按像素宽度写 colgroup（存成百分比，窗口变窄时按比例缩放）
+    apply(table, widths) {
+      const total = widths.reduce((a, b) => a + b, 0) || 1;
+      const cg = this.colgroup(table, true);
+      while (cg.children.length < widths.length) cg.appendChild(document.createElement('col'));
+      while (cg.children.length > widths.length) cg.lastElementChild.remove();
+      widths.forEach((w, i) => {
+        cg.children[i].style.width = (w / total * 100).toFixed(2) + '%';
+      });
+    },
+
+    // 增删列后校正 colgroup：新列取现有平均宽度，其余比例不变
+    sync(table, at, mode) {
+      const cg = table.querySelector(':scope > colgroup');
+      if (!cg) return;
+      const n = this.colCount(table);
+      if (!n) return;
+      let arr = Array.from(cg.children).map(c => parseFloat(c.style.width) || 0);
+      const avg = arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 100 / n;
+      if (mode === 'add') arr.splice(Math.max(0, Math.min(at, arr.length)), 0, avg);
+      else if (mode === 'del') arr.splice(Math.max(0, Math.min(at, arr.length - 1)), 1);
+      arr = arr.slice(0, n);
+      while (arr.length < n) arr.push(100 / n);
+      const sum = arr.reduce((a, b) => a + b, 0) || 1;
+      while (cg.children.length < n) cg.appendChild(document.createElement('col'));
+      while (cg.children.length > n) cg.lastElementChild.remove();
+      arr.forEach((w, i) => { cg.children[i].style.width = (w / sum * 100).toFixed(2) + '%'; });
+    },
+
+    reset(table) {
+      const cg = table.querySelector(':scope > colgroup');
+      if (cg) cg.remove();
+    },
+
+    // 光标是否压在某个列边界上 → 返回该边界左侧的列索引
+    hit(e) {
+      // 用鼠标所在的那个编辑器判断（双栏时不一定等于活动窗格）
+      const ed = e.target && e.target.closest ? e.target.closest('.editor') : null;
+      if (!ed || !e.target || !ed.contains(e.target)) return null;
+      const cell = e.target.closest && e.target.closest('td,th');
+      if (!cell) return null;
+      const table = cell.closest('table');
+      if (!table) return null;
+      const row = cell.parentNode;
+      const idx = Array.from(row.children).indexOf(cell);
+      const r = cell.getBoundingClientRect();
+      if (Math.abs(e.clientX - r.right) <= this.TOL && idx < row.children.length - 1) {
+        return { table, colIdx: idx };
+      }
+      if (Math.abs(e.clientX - r.left) <= this.TOL && idx > 0) {
+        return { table, colIdx: idx - 1 };
+      }
+      return null;
+    },
+
+    showGuide(x, table) {
+      const g = $('col-guide');
+      if (!g) return;
+      const r = table.getBoundingClientRect();
+      g.style.left = Math.round(x) + 'px';
+      g.style.top = r.top + 'px';
+      g.style.height = r.height + 'px';
+      g.classList.add('on');
+    },
+    hideGuide() {
+      const g = $('col-guide');
+      if (g) g.classList.remove('on');
+    },
+
+    hover(e) {
+      const hit = this.hit(e);
+      const ed = e.target && e.target.closest ? e.target.closest('.editor') : null;
+      if (ed) ed.style.cursor = hit ? 'col-resize' : '';
+      if (hit) this.showGuide(e.clientX, hit.table);
+      else this.hideGuide();
+      return hit;
+    },
+
+    start(e, hit) {
+      const m = this.metrics(hit.table);
+      if (!m || m.widths.length < 2) return;
+      this.drag = { table: hit.table, colIdx: hit.colIdx, startX: e.clientX, widths: m.widths.slice() };
+      document.body.classList.add('col-dragging');
+      this.showGuide(e.clientX, hit.table);
+      $('tbl-bar').classList.add('hidden');
+      e.preventDefault();
+    },
+
+    move(e) {
+      const d = this.drag;
+      if (!d) return;
+      if (!d.table.isConnected) { this.end(); return; }
+      const i = d.colIdx;
+      const pair = d.widths[i] + d.widths[i + 1];
+      let left = d.widths[i] + (e.clientX - d.startX);
+      // 两列合计不变，各自不小于 MIN；合计太窄时对半
+      left = pair < this.MIN * 2 ? pair / 2 : Math.max(this.MIN, Math.min(pair - this.MIN, left));
+      const arr = d.widths.slice();
+      arr[i] = left;
+      arr[i + 1] = pair - left;
+      this.apply(d.table, arr);
+      this.showGuide(e.clientX, d.table);
+    },
+
+    end() {
+      if (!this.drag) return;
+      const table = this.drag.table;
+      this.drag = null;
+      document.body.classList.remove('col-dragging');
+      this.hideGuide();
+      if (!table || !table.isConnected) return;
+      markDirty();
+      updateTableBar();
+      status('已调整列宽（双击列边界可恢复等宽）');
+    },
+
+    bind(p) {
+      const ed = p.el.editor;
+      if (!ed) return;
+      ed.addEventListener('mousemove', (e) => { if (!this.drag) this.hover(e); });
+      ed.addEventListener('mouseleave', () => {
+        if (this.drag) return;
+        ed.style.cursor = '';
+        this.hideGuide();
+      });
+      ed.addEventListener('mousedown', (e) => {
+        const hit = this.hit(e);
+        if (hit) this.start(e, hit);
+      });
+      // 双击列边界：恢复整表等分
+      ed.addEventListener('dblclick', (e) => {
+        const hit = this.hit(e);
+        if (!hit) return;
+        e.preventDefault();
+        this.reset(hit.table);
+        markDirty();
+        status('已恢复等宽列');
+      });
+      if (this._glob) return;      // 文档级监听只挂一次（双栏会 bind 两次）
+      this._glob = true;
+      document.addEventListener('mousemove', (e) => { if (this.drag) this.move(e); });
+      document.addEventListener('mouseup', () => { if (this.drag) this.end(); });
+      // 拖到窗口外松手时收尾，避免状态卡在拖拽中
+      window.addEventListener('blur', () => { if (this.drag) this.end(); });
+    },
+  };
+
+  /* ---------------- 格式化工具 ---------------- */
+  // 点工具栏时保住编辑器里的选区；没有选区就把光标放到末尾
+  function caretToLastBlock(p) {
+    p = p || curPane();
+    const el = ED(p);
+    let last = el.lastElementChild;
+    if (!last) { setMd(getMd(p), p); last = el.lastElementChild; }
+    if (/^(UL|OL)$/.test(last.tagName)) last = last.lastElementChild || last;
+    if (/^(LI|BLOCKQUOTE)$/.test(last.tagName)) last = last.lastElementChild || last;
+    placeCaretEnd(last || el);
+    return last;
+  }
+  function focusEditable(p) {
+    p = p || curPane();
+    const el = ED(p);
+    el.focus();
+    if (getRange(p)) return;
+    caretToLastBlock(p);
+  }
+  function applyFmt(fmt, p) {
+    p = p || curPane();
+    if (p.key !== ACTIVE) setActive(p.key);
+    focusEditable(p);
+    if (fmt === 'h1') setBlockTag('h1');
+    else if (fmt === 'h2') setBlockTag('h2');
+    else if (fmt === 'h3') setBlockTag('h3');
+    else if (fmt === 'p') setBlockTag('p');
+    else if (fmt === 'ul') toggleList('ul');
+    else if (fmt === 'ol') toggleList('ol');
+    else if (fmt === 'quote') setBlockTag('blockquote');
+    else if (fmt === 'bold') wrapInline('strong');
+    else if (fmt === 'italic') wrapInline('em');
+    else if (fmt === 'strike') wrapInline('del');
+    else if (fmt === 'code') wrapInline('code');
+    else if (fmt === 'color') togglePalette();
+    else if (fmt === 'mark') applyMark();
+    else if (fmt === 'link') insertLink();
+    else if (fmt === 'wiki') insertWiki();
+    else if (fmt === 'tag') insertTagNode();
+    else if (fmt === 'codeblock') insertCodeBlock();
+    else if (fmt === 'table') insertTable();
+    ED(p).focus();
+    updatePlaceholder(p);
+    markDirty(p);
+  }
+
+  /* ---------------- 导入 / 导出 ---------------- */
+  function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  function downloadNote(note) {
+    const blob = new Blob([note.content || ''], { type: 'text/markdown;charset=utf-8' });
+    triggerDownload(blob, /\.md$/i.test(note.name) ? note.name : note.name + '.md');
+  }
+
+  /* ---- ZIP：零依赖打包 / 解包（支持 deflate-raw 就压缩，否则原样存储） ---- */
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[i] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(u8) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  async function deflateRaw(u8) {
+    if (typeof CompressionStream === 'undefined') return null;
+    try {
+      const cs = new CompressionStream('deflate-raw');
+      const w = cs.writable.getWriter();
+      w.write(u8); w.close();
+      const out = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+      return out.length < u8.length ? out : null;   // 压不小就存原样
+    } catch { return null; }
+  }
+  async function inflateRaw(u8) {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('当前浏览器不支持解压，请用 Chrome / Edge 打开');
+    }
+    const ds = new DecompressionStream('deflate-raw');
+    const w = ds.writable.getWriter();
+    w.write(u8); w.close();
+    return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }
+  function dosDateTime(d) {
+    return {
+      time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+      date: ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+    };
+  }
+  async function makeZip(items) {           // items: [{ name, text }]
+    const enc = new TextEncoder();
+    const { time, date } = dosDateTime(new Date());
+    const parts = [], central = [];
+    let offset = 0;
+    for (const it of items) {
+      const nameBytes = enc.encode(it.name);
+      const raw = enc.encode(it.text);
+      const crc = crc32(raw);
+      const def = await deflateRaw(raw);
+      const data = def || raw;
+      const method = def ? 8 : 0;
+
+      const lh = new Uint8Array(30 + nameBytes.length);
+      const lv = new DataView(lh.buffer);
+      lv.setUint32(0, 0x04034b50, true);
+      lv.setUint16(4, 20, true);
+      lv.setUint16(6, 0x0800, true);        // bit 11：文件名 UTF-8
+      lv.setUint16(8, method, true);
+      lv.setUint16(10, time, true);
+      lv.setUint16(12, date, true);
+      lv.setUint32(14, crc, true);
+      lv.setUint32(18, data.length, true);
+      lv.setUint32(22, raw.length, true);
+      lv.setUint16(26, nameBytes.length, true);
+      lv.setUint16(28, 0, true);
+      lh.set(nameBytes, 30);
+      parts.push(lh, data);
+
+      const ch = new Uint8Array(46 + nameBytes.length);
+      const cv = new DataView(ch.buffer);
+      cv.setUint32(0, 0x02014b50, true);
+      cv.setUint16(4, 20, true);
+      cv.setUint16(6, 20, true);
+      cv.setUint16(8, 0x0800, true);
+      cv.setUint16(10, method, true);
+      cv.setUint16(12, time, true);
+      cv.setUint16(14, date, true);
+      cv.setUint32(16, crc, true);
+      cv.setUint32(20, data.length, true);
+      cv.setUint32(24, raw.length, true);
+      cv.setUint16(28, nameBytes.length, true);
+      cv.setUint16(30, 0, true);
+      cv.setUint16(32, 0, true);
+      cv.setUint16(34, 0, true);
+      cv.setUint16(36, 0, true);
+      cv.setUint32(38, 0, true);
+      cv.setUint32(42, offset, true);
+      ch.set(nameBytes, 46);
+      central.push(ch);
+
+      offset += lh.length + data.length;
+    }
+    const cdSize = central.reduce((a, b) => a + b.length, 0);
+    const eocd = new Uint8Array(22);
+    const ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(8, items.length, true);
+    ev.setUint16(10, items.length, true);
+    ev.setUint32(12, cdSize, true);
+    ev.setUint32(16, offset, true);
+    return new Blob(parts.concat(central, [eocd]), { type: 'application/zip' });
+  }
+  async function readZip(arrayBuffer) {
+    const u8 = new Uint8Array(arrayBuffer);
+    const dv = new DataView(arrayBuffer);
+    if (u8.length < 22) throw new Error('不是有效的 zip 文件');
+    let eocd = -1;
+    const minPos = Math.max(0, u8.length - 65557);
+    for (let i = u8.length - 22; i >= minPos; i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('不是有效的 zip 文件（找不到目录结构）');
+    const count = dv.getUint16(eocd + 10, true);
+    let p = dv.getUint32(eocd + 16, true);
+    const dec = new TextDecoder('utf-8');
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('zip 目录损坏，无法读取');
+      const method = dv.getUint16(p + 10, true);
+      const compSize = dv.getUint32(p + 20, true);
+      const nameLen = dv.getUint16(p + 28, true);
+      const extraLen = dv.getUint16(p + 30, true);
+      const cmtLen = dv.getUint16(p + 32, true);
+      const lho = dv.getUint32(p + 42, true);
+      const name = dec.decode(u8.subarray(p + 46, p + 46 + nameLen));
+      const lNameLen = dv.getUint16(lho + 26, true);
+      const lExtraLen = dv.getUint16(lho + 28, true);
+      const start = lho + 30 + lNameLen + lExtraLen;
+      const data = u8.subarray(start, start + compSize);
+      out.push({
+        name,
+        load: () => (method === 0 ? Promise.resolve(data) : inflateRaw(data)),
+      });
+      p += 46 + nameLen + extraLen + cmtLen;
+    }
+    return out;
+  }
+
+  function stampNow() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+      '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+  }
+  async function zipAllNotes() {          // → { blob, filename, count }
+    const notes = (await Store.allNotes()).filter(n => !isBlankJournal(n));
+    if (!notes.length) throw new Error('还没有可导出的笔记');
+    const items = notes.map(n => ({
+      name: /\.md$/i.test(n.name) ? n.name : n.name + '.md',
+      text: n.content || '',
+    })).sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+    return {
+      blob: await makeZip(items),
+      filename: 'DK-NOTE-' + stampNow() + '.zip',
+      count: items.length,
+    };
+  }
+  async function exportAll() {
+    try {
+      const { blob, filename, count } = await zipAllNotes();
+      triggerDownload(blob, filename);
+      status('已导出 ' + count + ' 篇笔记：' + filename);
+    } catch (e) {
+      alert('导出失败：' + (e.message || e));
+    }
+  }
+  async function importFromFiles(files) {
+    const decode = (bytes) => {
+      let t = new TextDecoder('utf-8').decode(bytes);
+      if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);   // 去掉 UTF-8 BOM（Windows 记事本/PS 会写）
+      return t;
+    };
+    let entries = [];
+    for (const f of files) {
+      if (/\.zip$/i.test(f.name)) {
+        const items = await readZip(await f.arrayBuffer());
+        for (const it of items) {
+          // Windows 的压缩工具会写反斜杠作路径分隔，两种都认
+          const base = (it.name.split(/[\\/]/).pop() || '').trim();
+          if (!/\.md$/i.test(base)) continue;
+          if (/^__MACOSX[\\/]/.test(it.name) || /^\._/.test(base)) continue;
+          entries.push({ name: base, content: decode(await it.load()) });
+        }
+      } else if (/\.(md|markdown)$/i.test(f.name)) {
+        entries.push({ name: f.name.replace(/\.markdown$/i, '.md'), content: await f.text() });
+      }
+    }
+    // 同名只留最后一份
+    const map = new Map();
+    entries.forEach(e => map.set(e.name, e.content));
+    entries = Array.from(map, ([name, content]) => ({ name, content }));
+    if (!entries.length) {
+      alert('没有找到可导入的 .md 笔记');
+      return;
+    }
+    const existing = await Store.allNotes();
+    const byName = new Map(existing.map(n => [n.name, n]));
+    const over = entries.filter(e => byName.has(e.name)).length;
+    if (!confirm('将导入 ' + entries.length + ' 篇笔记' +
+      (over ? '，其中 ' + over + ' 篇与现有笔记同名，会被导入内容覆盖' : '') +
+      '。\n\n确定继续？')) return;
+
+    for (const e of entries) {
+      const old = byName.get(e.name);
+      await Store.put({ name: e.name, content: e.content, favorite: old ? !!old.favorite : false });
+    }
+    await refreshAll();
+    status('已导入 ' + entries.length + ' 篇笔记');
+  }
+
+  /* ---------------- WebDAV ---------------- */
+  function davClient() {
+    const cfg = S.dav;
+    const auth = cfg.user || cfg.pass
+      ? 'Basic ' + btoa(unescape(encodeURIComponent(cfg.user + ':' + cfg.pass)))
+      : null;
+    const headers = (extra) => Object.assign(auth ? { Authorization: auth } : {}, extra || {});
+    const join = (name) => cfg.url.replace(/\/+$/, '/') + encodeURIComponent(name);
+    return {
+      valid: /^https?:\/\//.test(cfg.url),
+      async test() {
+        const r = await fetch(cfg.url, { method: 'PROPFIND', headers: headers({ Depth: '0' }) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return true;
+      },
+      async mkcol() {
+        const r = await fetch(cfg.url, { method: 'MKCOL', headers: headers() });
+        if (!r.ok && r.status !== 405 && r.status !== 301) throw new Error('MKCOL HTTP ' + r.status);
+      },
+      async list() {
+        const r = await fetch(cfg.url, {
+          method: 'PROPFIND',
+          headers: headers({ Depth: '1', 'Content-Type': 'application/xml' }),
+          body: '<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop>' +
+            '<d:displayname/><d:getcontentlength/><d:getlastmodified/><d:resourcetype/></d:prop></d:propfind>',
+        });
+        if (!r.ok) throw new Error('PROPFIND HTTP ' + r.status);
+        const xml = await r.text();
+        const doc = new DOMParser().parseFromString(xml, 'application/xml');
+        const out = [];
+        Array.from(doc.getElementsByTagNameNS('DAV:', 'response')).forEach(resp => {
+          const rt = resp.getElementsByTagNameNS('DAV:', 'resourcetype')[0];
+          if (rt && rt.getElementsByTagNameNS('DAV:', 'collection').length) return;
+          const href = (resp.getElementsByTagNameNS('DAV:', 'href')[0] || {}).textContent || '';
+          const name = decodeURIComponent(href.split('/').filter(Boolean).pop() || '');
+          if (!/\.md$/i.test(name)) return;
+          const len = resp.getElementsByTagNameNS('DAV:', 'getcontentlength')[0];
+          const mod = resp.getElementsByTagNameNS('DAV:', 'getlastmodified')[0];
+          out.push({
+            name: name,
+            size: len ? +len.textContent : 0,
+            lastModified: mod ? new Date(mod.textContent).getTime() : 0,
+          });
+        });
+        return out;
+      },
+      async get(name) {
+        const r = await fetch(join(name), { headers: headers() });
+        if (!r.ok) throw new Error('GET ' + name + ' HTTP ' + r.status);
+        return r.text();
+      },
+      async put(name, content) {
+        const r = await fetch(join(name), {
+          method: 'PUT',
+          headers: headers({ 'Content-Type': 'text/markdown; charset=utf-8' }),
+          body: content,
+        });
+        if (!r.ok) throw new Error('PUT ' + name + ' HTTP ' + r.status);
+      },
+    };
+  }
+
+  async function davPutOne(note) {
+    const dav = davClient();
+    if (!dav.valid) throw new Error('未配置 WebDAV');
+    await dav.mkcol();
+    await dav.put(note.name, note.content || '');
+    setSyncStatus('已上传 ' + note.name);
+  }
+
+  /* ---------------- 设置 ---------------- */
+  async function openSettings() {
+    $('set-dav-url').value = S.dav.url;
+    $('set-dav-user').value = S.dav.user;
+    $('set-dav-pass').value = S.dav.pass;
+    $('set-dav-auto').checked = S.dav.auto;
+    $('set-split').checked = S.split;
+    $('set-monday').checked = S.firstMonday;
+    const labels = {
+      indexeddb: 'IndexedDB（浏览器内持久化）',
+      localstorage: 'localStorage（降级模式）',
+      memory: '内存（刷新即丢失，请立即导出备份）',
+    };
+    $('storage-hint').textContent = '当前存储：' + (labels[Store.mode] || Store.mode);
+    $('modal-settings').classList.remove('hidden');
+  }
+  function closeSettings() { $('modal-settings').classList.add('hidden'); }
+  async function saveDavCfg() {
+    S.dav = {
+      url: $('set-dav-url').value.trim(),
+      user: $('set-dav-user').value.trim(),
+      pass: $('set-dav-pass').value,
+      auto: $('set-dav-auto').checked,
+    };
+    await Store.setSetting('dav', S.dav);
+  }
+  function davStatus(msg, cls) {
+    const el = $('dav-status');
+    el.textContent = msg;
+    el.className = 'modal-status ' + (cls || '');
+  }
+
+  /* ---------------- 快捷键 ---------------- */
+  function bindKeys() {
+    document.addEventListener('keydown', (e) => {
+      const meta = e.ctrlKey || e.metaKey;
+      // 双栏时 Ctrl+S 把两边都存一遍，避免右栏内容还挂在定时器上
+      if (meta && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveCurrent(true, curPane());
+        if (PANES.b) saveCurrent(false, PANES.b);
+      }
+      if (meta && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        S.view = S.view === 'edit' ? 'preview' : 'edit';
+        S.split = false; applyView();
+      }
+      // Ctrl+Shift+D：双栏（连续两天）
+      if (meta && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setDaySplit(!S.daySplit);
+        return;
+      }
+      if (meta && !e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); openJournal(new Date()); }
+      // 对齐 Orca：Ctrl+O 把选中文字转成标签
+      if (meta && e.key.toLowerCase() === 'o') { e.preventDefault(); applyFmt('tag'); }
+      // 撤回 / 重做（统一走快照栈，避免浏览器原生撤销和块操作打架）
+      // 源码框和标题框里保留浏览器原生撤销，否则会把焦点弹回正文
+      const ae = document.activeElement;
+      const inField = ae && (ae.classList.contains('src-view') || ae.classList.contains('doc-title'));
+      if (meta && e.key.toLowerCase() === 'z') {
+        if (inField) return;
+        e.preventDefault();
+        const u = curPane().undo;
+        if (e.shiftKey) u.redo(); else u.undo();
+      }
+      if (meta && e.key.toLowerCase() === 'y') {
+        if (inField) return;
+        e.preventDefault();
+        curPane().undo.redo();
+      }
+    });
+  }
+  /* ---------------- 单个窗格的交互 ---------------- */
+  let tblTick = null;
+  function refreshTableBar() {
+    clearTimeout(tblTick);
+    tblTick = setTimeout(updateTableBar, 30);
+  }
+
+  function bindPane(p) {
+    const ed = p.el.editor;
+
+    // 谁被点击 / 聚焦，谁就是活动窗格（capture 保证先于工具栏自己的监听）
+    p.root.addEventListener('mousedown', () => setActive(p.key), true);
+    p.root.addEventListener('focusin', () => setActive(p.key));
+
+    // 编辑器：所见即所得（底层仍写 Markdown）
+    ed.addEventListener('input', (e) => {
+      if (e.isComposing) { markDirty(p); return; }
+      autoFormat();
+      markDirty(p);
+    });
+    ed.addEventListener('keydown', (e) => {
+      if (e.isComposing) return;
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        if (handleEnter(e)) { markDirty(p); }
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (handleTab(e)) { e.preventDefault(); markDirty(p); }
+        return;
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        const blk = blockOf();
+        const li = blk && blk.closest && blk.closest('li');
+        if (li && handleDeleteKey(li, e.key)) { e.preventDefault(); markDirty(p); }
+      }
+    });
+    ed.addEventListener('paste', (e) => {
+      const dt = e.clipboardData || window.clipboardData;
+      if (!dt) return;
+      const text = dt.getData('text/plain') || '';
+      const htmlRaw = dt.getData('text/html') || '';
+      const blk = blockOf();
+
+      // 代码块里粘贴：保持纯文本，别把代码变成排版
+      if (blk && blk.tagName === 'PRE') {
+        if (!text) return;
+        e.preventDefault();
+        document.execCommand('insertText', false, text);
+        markDirty(p);
+        return;
+      }
+
+      const holder = htmlRaw ? pasteHtmlToNodes(htmlRaw) : null;
+      const FMT = 'ul,ol,table,pre,blockquote,h1,h2,h3,h4,h5,h6,hr,strong,b,em,i,del,s,strike,code,mark,a,img';
+      const hasFmt = !!(holder && holder.querySelector(FMT));
+      const mdLike = /(^|\n)(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```|\|)/.test(text);
+
+      // 富文本优先：别的编辑器复制过来的粗体、多级列表、表格都在这儿保住
+      if (holder && hasFmt) {
+        e.preventDefault();
+        document.execCommand('insertHTML', false, holder.innerHTML || '<br>');
+        liftNestedBlocks(ed);
+        tidyAfterPaste(ed);
+        ensureBlock();
+        markDirty(p);
+        return;
+      }
+      if (!text) {
+        // 只有 HTML 没有纯文本（罕见）：结构简单就直接插，否则放弃
+        if (holder && holder.innerHTML.trim()) {
+          e.preventDefault();
+          document.execCommand('insertHTML', false, holder.innerHTML);
+          liftNestedBlocks(ed);
+          tidyAfterPaste(ed);
+          ensureBlock();
+          markDirty(p);
+        }
+        return;
+      }
+      e.preventDefault();
+      if (mdLike) {
+        // 纯文本但写着 Markdown 语法 → 渲染成排版
+        document.execCommand('insertHTML', false, renderMd(text));
+        liftNestedBlocks(ed);
+        tidyAfterPaste(ed);
+        ensureBlock();
+      } else {
+        document.execCommand('insertText', false, text);
+      }
+      markDirty(p);
+    });
+    // 编辑态里点双链 / 标签
+    ed.addEventListener('click', async (e) => {
+      const tagEl = e.target.closest('[data-tag]');
+      if (tagEl) {
+        e.preventDefault();
+        const t = tagEl.dataset.tag;
+        document.querySelector('.seg-item[data-tab="tags"]').click();
+        filterByTag(t);
+        status('筛选 #' + t);
+        return;
+      }
+      const a = e.target.closest('[data-wiki]');
+      if (!a) return;
+      e.preventDefault();
+      const name = a.dataset.wiki;
+      let note = await Store.byName(name + '.md');
+      if (!note) {
+        note = await Store.put({ name: name + '.md', content: '', favorite: false });
+        await refreshAll();
+      }
+      await openNote(note, true, true, p);
+    });
+    ed.addEventListener('blur', () => renderSource(p));
+    // 点编辑器空白区：光标落到最后一个块，而不是编辑器根
+    ed.addEventListener('mousedown', (e) => {
+      if (e.target === ed) {
+        e.preventDefault();
+        ed.focus();
+        caretToLastBlock(p);
+      }
+    });
+
+    // 源码视图（可直接编辑，改完回写富文本）
+    p.el.src.addEventListener('input', () => {
+      ed.innerHTML = renderMd(p.el.src.value);
+      updatePlaceholder(p);
+      markDirty(p);
+    });
+
+    p.el.title.addEventListener('input', () => markDirty(p));
+    // 日期翻页：前后一天
+    p.el.prevDay.addEventListener('click', () => stepDay(-1, p));
+    p.el.nextDay.addEventListener('click', () => stepDay(1, p));
+
+    p.el.toolbar.addEventListener('mousedown', (e) => {
+      // 保住编辑器选区，避免点按钮后光标丢失
+      if (e.target.closest('button[data-fmt], .tb-act, .tb-palette')) e.preventDefault();
+    });
+    p.el.toolbar.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-fmt]');
+      if (b) applyFmt(b.dataset.fmt, p);
+    });
+    // 撤回 / 重做（本窗格）
+    p.el.undo.addEventListener('click', () => p.undo.undo());
+    p.el.redo.addEventListener('click', () => p.undo.redo());
+    // 色板：选颜色 / 恢复默认
+    p.el.palette.addEventListener('click', (e) => {
+      const sw = e.target.closest('.tb-swatch');
+      if (sw) applyColor(sw.dataset.color || '');
+    });
+
+    // 标签输入（聚焦/输入时给出标签池建议，点一下才加到本篇）
+    const dtInput = p.el.tagInput;
+    dtInput.addEventListener('focus', () => showTagSuggest(p));
+    dtInput.addEventListener('input', () => showTagSuggest(p));
+    dtInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); showTagSuggest(p); moveTagSug(1, p); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); moveTagSug(-1, p); return; }
+      if (e.key === 'Escape') { hideTagSuggest(p); return; }
+      if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+        e.preventDefault();
+        if (tagSugIdx >= 0 && tagSugList[tagSugIdx]) { pickTag(tagSugList[tagSugIdx].name, p); return; }
+        addTag(dtInput.value, p);
+        dtInput.value = '';
+        hideTagSuggest(p);
+      } else if (e.key === 'Backspace' && !dtInput.value) {
+        const tags = extractTags(getMd(p));
+        if (tags.length) removeTag(tags[tags.length - 1], p);
+      }
+    });
+    dtInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (dtInput.value.trim()) { addTag(dtInput.value, p); dtInput.value = ''; }
+        hideTagSuggest(p);
+      }, 130);
+    });
+
+    // 表格
+    ed.addEventListener('click', refreshTableBar);
+    ed.addEventListener('keyup', refreshTableBar);
+    p.el.editPane.addEventListener('scroll', updateTableBar);
+    ColResize.bind(p);
+    buildPalette(p);
+  }
+
+
+  /* ---------------- 绑定 UI ---------------- */
+  const isNarrow = () => window.innerWidth <= 820;
+  // 侧栏：宽屏常驻；窄屏当抽屉用，打开时给内容区盖一层遮罩
+  function setSidebar(open) {
+    const sb = $('sidebar'), btn = $('btn-open-sidebar'), mask = $('side-mask');
+    if (!sb) return;
+    sb.classList.toggle('collapsed', !open);
+    if (btn) btn.classList.toggle('hidden', open);
+    if (mask) mask.classList.toggle('show', !!open && isNarrow());
+  }
+  function bindUI() {
+    // 侧栏
+    $('btn-collapse').addEventListener('click', () => setSidebar(false));
+    $('btn-open-sidebar').addEventListener('click', () => setSidebar(true));
+    $('side-mask').addEventListener('click', () => setSidebar(false));
+    // 窄屏启动时先收起，把正文宽度让出来
+    if (isNarrow()) setSidebar(false);
+    let wasNarrow = isNarrow();
+    window.addEventListener('resize', () => {
+      const now = isNarrow();
+      if (now === wasNarrow) return;
+      wasNarrow = now;
+      setSidebar(!now);
+    });
+
+    // 日历
+    $('cal-prev').addEventListener('click', () => {
+      S.calView = new Date(S.calView.getFullYear(), S.calView.getMonth() - 1, 1);
+      renderCalendar();
+    });
+    $('cal-next').addEventListener('click', () => {
+      S.calView = new Date(S.calView.getFullYear(), S.calView.getMonth() + 1, 1);
+      renderCalendar();
+    });
+    $('cal-today').addEventListener('click', () => {
+      const now = new Date();
+      S.calView = new Date(now.getFullYear(), now.getMonth(), 1);
+      S.calSel = now;
+      renderCalendar();
+      openJournal(now);
+    });
+
+    // 页签：收藏 / 标签（都没有选中 = 全部）
+    document.querySelectorAll('.seg-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        const turnOn = !btn.classList.contains('selected');
+        document.querySelectorAll('.seg-item').forEach(b => b.classList.remove('selected'));
+        if (!turnOn) {               // 再点一次取消 → 回到全部笔记
+          S.tab = 'notes';
+          $('tag-list').classList.add('hidden');
+          $('note-list').classList.remove('hidden');
+          renderNotes();
+          return;
+        }
+        btn.classList.add('selected');
+        if (tab === 'tags') {
+          $('note-list').classList.add('hidden');
+          $('filter-bar').classList.add('hidden');
+          $('tag-list').classList.remove('hidden');
+          return;
+        }
+        S.tab = tab;                 // fav
+        S.tagFilter = '';            // 切页签清掉标签筛选
+        $('tag-list').classList.add('hidden');
+        $('note-list').classList.remove('hidden');
+        renderNotes();
+      });
+    });
+
+    // 清除筛选 / 搜索
+    $('filter-clear').addEventListener('click', () => {
+      S.tagFilter = '';
+      if (S.search) { S.search = ''; $('search').value = ''; }
+      renderNotes();
+    });
+
+    // 搜索：标题、日记中文日期、正文（去 Markdown 标记）一起匹配，空格分词
+    $('search').addEventListener('input', (e) => { S.search = e.target.value; renderNotes(); });
+    $('search').addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        S.search = ''; e.target.value = ''; e.target.blur(); renderNotes();
+      } else if (e.key === 'Enter') {
+        // 回车直接打开第一条结果
+        e.preventDefault();
+        const first = document.querySelector('#note-list .note-item');
+        if (first) first.click();
+      }
+    });
+
+    // 表格浮动工具条（文档级）
+    $('tbl-bar').addEventListener('mousedown', (e) => { e.preventDefault(); });
+    $('tbl-bar').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-tbl]');
+      if (b) tableOp(b.dataset.tbl);
+    });
+    document.addEventListener('selectionchange', refreshTableBar);
+    window.addEventListener('resize', updateTableBar);
+
+    // 点空白处收起色板 / 标签建议
+    document.addEventListener('click', (e) => {
+      ['a', 'b'].forEach(k => {
+        const p = PANES[k];
+        if (!p) return;
+        if (!e.target.closest('.tb-color-wrap')) hidePalette(p);
+        if (!e.target.closest('.doc-tags')) hideTagSuggest(p);
+      });
+    });
+
+    // 顶部按钮
+    $('btn-view').addEventListener('click', () => {
+      S.view = S.view === 'edit' ? 'preview' : 'edit';
+      S.split = false; applyView();
+    });
+    $('btn-day-split').addEventListener('click', () => setDaySplit(!S.daySplit));
+    $('btn-save').addEventListener('click', () => saveCurrent(true));
+    $('btn-settings-side').addEventListener('click', openSettings);
+    $('btn-theme').addEventListener('click', async () => {
+      document.body.classList.toggle('dark');
+      await Store.setSetting('dark', document.body.classList.contains('dark'));
+    });
+    // 字体可能异步就绪，就绪后重算一次标题宽度
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        ['a', 'b'].forEach(k => {
+          const p = PANES[k];
+          const jd = p && currentJournalDate(p);
+          if (jd) fitDatedTitle(jd, p);
+        });
+      });
+    }
+
+    // 导入 / 恢复（入口在设置里）：支持 .zip 备份包，也支持零散的 .md
+    $('btn-import-settings').addEventListener('click', () => $('file-import').click());
+    $('file-import').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      if (!files.length) return;
+      try {
+        await importFromFiles(files);
+      } catch (err) {
+        alert('导入失败：' + (err.message || err));
+      }
+    });
+
+    // 底部引用面板（只有「引用方」一项，不再有页签切换）
+    function toggleBp() {
+      const panel = $('bottom-panel');
+      S.bpOpen = !S.bpOpen;
+      panel.classList.toggle('collapsed', !S.bpOpen);
+      if (S.bpOpen) renderBottomPanel();
+    }
+    $('btn-bp-toggle').addEventListener('click', toggleBp);
+    $('bp-summary').addEventListener('click', toggleBp);
+
+    // 设置弹窗
+    $('btn-close-settings').addEventListener('click', closeSettings);
+    $('modal-settings').addEventListener('click', (e) => {
+      if (e.target === $('modal-settings')) closeSettings();
+    });
+    ['set-dav-url', 'set-dav-user', 'set-dav-pass', 'set-dav-auto'].forEach(id => {
+      $(id).addEventListener('change', saveDavCfg);
+    });
+    $('set-split').addEventListener('change', async () => {
+      S.split = $('set-split').checked;
+      await Store.setSetting('split', S.split);
+      applyView();
+    });
+    $('set-monday').addEventListener('change', async () => {
+      S.firstMonday = $('set-monday').checked;
+      await Store.setSetting('firstMonday', S.firstMonday);
+      renderCalendar();
+    });
+
+    $('btn-dav-test').addEventListener('click', async () => {
+      await saveDavCfg();
+      const dav = davClient();
+      if (!dav.valid) return davStatus('请先填写有效的服务器地址', 'err');
+      davStatus('连接中…');
+      try { await dav.test(); davStatus('连接成功 ✓', 'ok'); }
+      catch (e) { davStatus('连接失败：' + e.message, 'err'); }
+    });
+
+    $('btn-dav-up').addEventListener('click', async () => {
+      await saveDavCfg();
+      const dav = davClient();
+      if (!dav.valid) return davStatus('请先填写有效的服务器地址', 'err');
+      davStatus('上传中…');
+      try {
+        await dav.mkcol();
+        const notes = (await Store.allNotes()).filter(n => !isBlankJournal(n));
+        for (const n of notes) await dav.put(n.name, n.content || '');
+        davStatus('已上传 ' + notes.length + ' 个笔记 ✓', 'ok');
+        setSyncStatus('WebDAV 已上传 ' + notes.length + ' 篇');
+      } catch (e) { davStatus('上传失败：' + e.message, 'err'); }
+    });
+
+    $('btn-dav-down').addEventListener('click', async () => {
+      await saveDavCfg();
+      const dav = davClient();
+      if (!dav.valid) return davStatus('请先填写有效的服务器地址', 'err');
+      davStatus('下载中…');
+      try {
+        const remote = await dav.list();
+        let n = 0;
+        for (const item of remote) {
+          const local = await Store.byName(item.name);
+          if (!local || (item.lastModified && item.lastModified > (local.updatedAt || 0))) {
+            const content = await dav.get(item.name);
+            await Store.put({ id: local ? local.id : undefined, name: item.name, content: content, favorite: local ? local.favorite : false });
+            n++;
+          }
+        }
+        await refreshAll();
+        davStatus('合并完成：更新 ' + n + ' 篇 / 远端 ' + remote.length + ' 篇 ✓', 'ok');
+        setSyncStatus('WebDAV 已拉取 ' + n + ' 篇');
+      } catch (e) { davStatus('下载失败：' + e.message, 'err'); }
+    });
+
+    $('btn-export-settings').addEventListener('click', exportAll);
+
+    $('btn-clear').addEventListener('click', async () => {
+      if (!confirm('确定清空全部本地笔记？此操作不可恢复。\n\n建议先用「导出备份 (.zip)」留一份。')) return;
+      await Store.clear();
+      S.current = null;
+      await refreshAll();
+      await openJournal(new Date());
+      status('本地数据已清空');
+    });
+
+    bindKeys();
+  }
+
+  /* ---------------- 启动 ---------------- */
+  // 自动化测试 / 调试钩子
+  window.__orca = {
+    getMd: (k) => getMd(k ? PANES[k] : undefined),
+    setMd: (md, k) => setMd(md, k ? PANES[k] : undefined),
+    renderMd, htmlToMd, applyFmt,
+    el: (k) => ED(k ? PANES[k] : undefined),
+    focus: (k) => ED(k ? PANES[k] : undefined).focus(),
+    undo: () => curPane().undo.undo(),
+    redo: () => curPane().undo.redo(),
+    undoSnap: () => curPane().undo.snap(),
+    undoState: () => ({ idx: curPane().undo.idx, len: curPane().undo.stack.length }),
+    tagPool: () => tagPool(),
+    store: Store,
+    refresh: () => refreshAll(),
+    state: () => S,
+    tableOp,
+    zipAllNotes,
+    readZip,
+    importFromFiles,
+    exportAll,
+    // 双栏相关
+    panes: () => PANES,
+    active: () => ACTIVE,
+    setDaySplit,
+    openJournal,
+    openNote,
+  };
+
+  async function boot() {
+    // 1) 先同步渲染日历（不依赖存储，保证任何环境下都有界面）
+    renderCalendar();
+
+    // 2) 初始化存储
+    const mode = await Store.init();
+
+    // 3) 读设置
+    S.dav = (await Store.getSetting('dav', null)) || { url: '', user: '', pass: '', auto: false };
+    S.split = !!(await Store.getSetting('split', false));
+    const wantDaySplit = !!(await Store.getSetting('daySplit', false));
+    S.firstMonday = (await Store.getSetting('firstMonday', true)) !== false;
+    if (await Store.getSetting('dark', false)) document.body.classList.add('dark');
+
+    initPanes();
+    bindUI();
+    applyView();
+
+    // 4) 数据
+    const purged = await purgeBlankJournals();
+    await refreshAll();
+    await openJournal(new Date());
+    // 上次退出时是双栏，就恢复双栏（右栏为次日）
+    if (wantDaySplit) await setDaySplit(true);
+
+    if (purged) {
+      status('已清理 ' + purged + ' 篇空白日记');
+    } else if (mode !== 'indexeddb') {
+      status('存储降级为 ' + mode + '，建议导出备份');
+    } else if (!S.daySplit) {
+      status('就绪');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>
