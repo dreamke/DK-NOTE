@@ -4823,6 +4823,18 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
   } else {
     boot();
   }
+
+  /* 离线缓存：编辑器内核 3.6MB，线上冷启动要十几秒；装个 Service Worker 之后
+     第二次打开走缓存（0.2s），断网也能写。只在 https 下启用，本地 file:// 与
+     dev-server 不装，避免开发时被旧缓存骗。想在本机试可加 ?sw=1。 */
+  (function initSW() {
+    if (!('serviceWorker' in navigator)) return;
+    const force = /[?&]sw=1(&|$)/.test(location.search);
+    if (location.protocol !== 'https:' && !force) return;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  })();
 })();
 </script>
 </body>
