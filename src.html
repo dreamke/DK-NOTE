@@ -594,7 +594,7 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
 <div class="boot" id="boot">
   <div class="boot-box">
     <div class="boot-title">正在加载编辑器</div>
-    <div class="boot-sub" id="boot-sub">首次打开需要下载编辑器内核，之后会走缓存</div>
+    <div class="boot-sub" id="boot-sub">首次打开要把整个应用下载完，之后会走缓存</div>
   </div>
 </div>
 <div id="app">
@@ -4824,7 +4824,7 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
     const sub = document.getElementById('boot-sub');
     const mask = document.getElementById('boot');
     if (sub && mask && !mask.classList.contains('done')) {
-      sub.textContent = '网络较慢，仍在下载编辑器内核…';
+      sub.textContent = '网络较慢，仍在下载应用本体…';
     }
   }, 9000);
 
