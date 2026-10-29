@@ -4491,7 +4491,11 @@ body.dark .pane .vditor-reset mark.vt-h{background:#5c4a12 !important;color:#f4e
     // 这个 input 会被浏览器自动填充（邮箱、地址之类），一旦顺手点一下正文就触发 blur，
     // 填充值会被写进正文变成 #dreamke@foxmail.com。只认 Enter / 逗号。
     dtInput.addEventListener('blur', () => {
-      setTimeout(() => { hideTagSuggest(p); }, 130);
+      setTimeout(() => {
+        // 自动填充塞进来的邮箱留在框里也碍眼，直接清掉（用户手打的正常标签不在此列）
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dtInput.value.trim())) dtInput.value = '';
+        hideTagSuggest(p);
+      }, 130);
     });
 
     tblBindPane(p);          // 表格列宽 / 行高拖拽
