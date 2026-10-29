@@ -11192,25 +11192,21 @@ document.body.insertAdjacentHTML('afterbegin', `<svg style="position: absolute; 
     boot();
   }
 
-  /* 离线缓存：编辑器内核 3.6MB，线上冷启动要十几秒；装个 Service Worker 之后
+  /* 离线缓存：整页就是全部内容（约 1MB gzip），装个 Service Worker 之后
      第二次打开走缓存（0.2s），断网也能写。只在 https 下启用，本地 file:// 与
      dev-server 不装，避免开发时被旧缓存骗。想在本机试可加 ?sw=1。
-     注册要等编辑器就绪再说：注册早了它会和页面抢带宽预缓存，把首屏拖成两倍。 */
+     注册等编辑器就绪后 3 秒：注册早了会和页面抢带宽，而这时页面刚下完，
+     预缓存直接命中 HTTP 缓存，几乎零成本。 */
   (function initSW() {
     if (!('serviceWorker' in navigator)) return;
     const force = /[?&]sw=1(&|$)/.test(location.search);
     if (location.protocol !== 'https:' && !force) return;
-    const go = () => navigator.serviceWorker.register('sw.js').catch(() => {});
-    const idle = () => {
-      const after = () => setTimeout(go, 6000);
-      if (window.requestIdleCallback) requestIdleCallback(after, { timeout: 15000 });
-      else after();
-    };
+    const go = () => setTimeout(() => navigator.serviceWorker.register('sw.js').catch(() => {}), 3000);
     if (!window.__orcaReady) {
-      // 首屏还在装编辑器：等它就绪后再排队
-      const t = setInterval(() => { if (window.__orcaReady) { clearInterval(t); idle(); } }, 1000);
-      setTimeout(() => { clearInterval(t); idle(); }, 60000);   // 兜底：一分钟没就绪也装上
-    } else idle();
+      // 首屏还在装编辑器：等它就绪再注册
+      const t = setInterval(() => { if (window.__orcaReady) { clearInterval(t); go(); } }, 1000);
+      setTimeout(() => { clearInterval(t); go(); }, 60000);   // 兜底：一分钟没就绪也装上
+    } else go();
   })();
 })();
 </script>
