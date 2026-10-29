@@ -25,8 +25,9 @@ const PRECACHE = [
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    // 逐个加，个别文件失败不拖累整体安装
-    await Promise.all(PRECACHE.map((u) => c.add(new Request(u, { cache: 'reload' })).catch(() => {})));
+    // 逐个加，个别文件失败不拖累整体安装。
+    // 不写 cache:'reload'：页面刚下过这些文件，走 HTTP 缓存直接取，不会重复下载那 3.6MB。
+    await Promise.all(PRECACHE.map((u) => c.add(u).catch(() => {})));
     await self.skipWaiting();
   })());
 });
